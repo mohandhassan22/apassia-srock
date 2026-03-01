@@ -863,21 +863,21 @@ function headerRow(ws,headers,row,hbg,hfg){
   headers.forEach((h,ci)=>{ws[col(ci)+row]=C(h,true,hbg,hfg,'center',11)});
 }
 
-const ROW_COLORS=['FFE8F2FF','FFFFFFFF'];
+const ROW_COLORS=['#FFE8F2FF','#FFFFFFFF'];
 
 function buildSim(){
   const ws={};
 
   // ── الألوان الأساسية ──
-  const HDR_BG   = 'FF5E35B1'; // موف غامق — header
-  const HDR_FG   = 'FFFFFFFF';
-  const SEC_CART = 'FF7E57C2'; // موف — سطر عنوان الكرتونة
-  const SEC_FG   = 'FFFFFFFF';
-  const ROW_PURP = 'FFF3E5F5'; // موف فاتح جداً
-  const ROW_WHT  = 'FFFFFFFF'; // أبيض
-  const ACCENT   = 'FF6A1B9A'; // موف نص
-  const MUTED    = 'FF9575CD';
-  const SEP_BG   = 'FFD1C4E9'; // فاصل بين sections
+  const HDR_BG   = '#FF5E35B1'; // موف غامق — header
+  const HDR_FG   = '#FFFFFFFF';
+  const SEC_CART = '#FF7E57C2'; // موف — سطر عنوان الكرتونة
+  const SEC_FG   = '#FFFFFFFF';
+  const ROW_PURP = '#FFF3E5F5'; // موف فاتح جداً
+  const ROW_WHT  = '#FFFFFFFF'; // أبيض
+  const ACCENT   = '#FF6A1B9A'; // موف نص
+  const MUTED    = '#FF9575CD';
+  const SEP_BG   = '#FFD1C4E9'; // فاصل بين sections
 
   // ── فرز البيانات ──
   const sortSerial=(a,b)=>{
