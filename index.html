@@ -133,14 +133,15 @@ tr:hover td{background:rgba(0,89,200,.07)}
 
       <!-- كرتونة -->
       <div class="card">
-        <div class="card-title">📦 إضافة كرتونة شرايح <span class="pill">بالنطاق تلقائي</span></div>
+        <div class="card-title">📦 إضافة كرتونة شرايح <span class="pill">نطاقات متعددة</span></div>
         <div id="sim-alert" class="alert"></div>
         <div class="fg"><label>اسم / رقم الكرتونة</label><input id="sim-name" placeholder="مثال: كرتونة يناير - بلوت 1"></div>
-        <div class="row2">
-          <div class="fg"><label>أول سيريل</label><input id="sim-from" placeholder="8920010000000001" oninput="previewSim()"></div>
-          <div class="fg"><label>آخر سيريل</label><input id="sim-to" placeholder="8920010000000100" oninput="previewSim()"></div>
-        </div>
-        <div id="sim-preview" class="rpreview"></div>
+
+        <!-- نطاقات متعددة -->
+        <div id="ranges-container"></div>
+        <button class="btn btn-blue2 mt-8" onclick="addRangeRow()" style="width:auto;padding:7px 16px;font-size:12px">➕ إضافة نطاق آخر</button>
+
+        <div id="sim-preview" class="rpreview" style="margin-top:10px"></div>
         <button class="btn btn-primary mt-8" onclick="addSimCarton()">➕ إضافة الكرتونة للمخزن</button>
       </div>
 
@@ -539,48 +540,105 @@ function showAlert(id,msg,type='ok'){
   setTimeout(()=>el.classList.remove('show'),3500);
 }
 
-// ═══ SIM ═══
-function previewSim(){
-  const f=document.getElementById('sim-from').value.trim();
-  const t=document.getElementById('sim-to').value.trim();
-  const p=document.getElementById('sim-preview');
-  if(!f||!t){p.classList.remove('show');return}
-  try{
-    const n=BigInt(f.replace(/\D/g,'')||0);
-    const m=BigInt(t.replace(/\D/g,'')||0);
-    const c=m-n+1n;
-    p.className='rpreview show';
-    p.style.color=c>0n?'var(--accent)':'var(--danger)';
-    p.textContent=c>0n?`✅ هيتم إضافة ${c} شريحة — من ${f} لحد ${t}`:'❌ السيريل الأول أكبر من الأخير!';
-  }catch{p.classList.remove('show')}
+// ═══ SIM MULTI-RANGE ═══
+let rangeCount = 0;
+
+function addRangeRow(fromVal='', toVal='') {
+  rangeCount++;
+  const id = rangeCount;
+  const container = document.getElementById('ranges-container');
+  const div = document.createElement('div');
+  div.id = 'range-row-' + id;
+  div.style.cssText = 'margin-bottom:10px;';
+  div.innerHTML = `
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+      <span style="font-size:11px;color:var(--muted);font-weight:700;min-width:60px">نطاق ${id}</span>
+      ${id > 1 ? `<button class="btn btn-danger" style="margin-right:auto" onclick="removeRange(${id})">🗑</button>` : ''}
+    </div>
+    <div class="row2">
+      <div class="fg" style="margin-bottom:0"><label>أول سيريل</label><input id="sim-from-${id}" placeholder="8920040000000001" value="${fromVal}" oninput="previewAllRanges()"></div>
+      <div class="fg" style="margin-bottom:0"><label>آخر سيريل</label><input id="sim-to-${id}" placeholder="8920040000000100" value="${toVal}" oninput="previewAllRanges()"></div>
+    </div>`;
+  container.appendChild(div);
+  previewAllRanges();
 }
 
-function genSerials(from,to){
-  const serials=[];
-  const numStr=from.match(/\d+$/);
-  if(!numStr)return[from,to];
-  const prefix=from.slice(0,from.lastIndexOf(numStr[0]));
-  const len=numStr[0].length;
-  const f=BigInt(numStr[0]);
-  const tNum=to.match(/\d+$/);
-  const t=tNum?BigInt(tNum[0]):f;
-  for(let i=f;i<=t;i++) serials.push(prefix+String(i).padStart(len,'0'));
+function removeRange(id) {
+  document.getElementById('range-row-' + id).remove();
+  previewAllRanges();
+}
+
+function getAllRanges() {
+  const rows = document.querySelectorAll('#ranges-container [id^="range-row-"]');
+  const ranges = [];
+  rows.forEach(row => {
+    const rowId = row.id.replace('range-row-', '');
+    const f = (document.getElementById('sim-from-' + rowId) || {}).value?.trim() || '';
+    const t = (document.getElementById('sim-to-' + rowId) || {}).value?.trim() || '';
+    if (f || t) ranges.push({from: f, to: t});
+  });
+  return ranges;
+}
+
+function previewSim() { previewAllRanges(); }
+
+function previewAllRanges() {
+  const p = document.getElementById('sim-preview');
+  const ranges = getAllRanges();
+  let total = 0n, errors = 0, lines = [];
+  ranges.forEach((r, i) => {
+    if (!r.from || !r.to) return;
+    try {
+      const f = BigInt(r.from.replace(/\D/g, '') || 0);
+      const t = BigInt(r.to.replace(/\D/g, '') || 0);
+      const c = t - f + 1n;
+      if (c > 0n) { total += c; lines.push(`نطاق ${i+1}: ${c} شريحة`); }
+      else errors++;
+    } catch { errors++; }
+  });
+  if (!lines.length && !errors) { p.classList.remove('show'); return; }
+  p.className = 'rpreview show';
+  p.style.color = errors ? 'var(--danger)' : 'var(--accent)';
+  p.innerHTML = errors
+    ? `❌ في ${errors} نطاق فيه خطأ`
+    : `✅ إجمالي: <strong>${total}</strong> شريحة — ${lines.join(' | ')}`;
+}
+
+function genSerials(from, to) {
+  const serials = [];
+  const numStr = from.match(/\d+$/);
+  if (!numStr) return [from, to];
+  const prefix = from.slice(0, from.lastIndexOf(numStr[0]));
+  const len = numStr[0].length;
+  const f = BigInt(numStr[0]);
+  const tNum = to.match(/\d+$/);
+  const t = tNum ? BigInt(tNum[0]) : f;
+  for (let i = f; i <= t; i++) serials.push(prefix + String(i).padStart(len, '0'));
   return serials;
 }
 
-function addSimCarton(){
-  const name=document.getElementById('sim-name').value.trim();
-  const from=document.getElementById('sim-from').value.trim();
-  const to=document.getElementById('sim-to').value.trim();
-  if(!name||!from||!to){showAlert('sim','⚠️ اكتب اسم الكرتونة والسيريل الأول والأخير','err');return}
-  const serials=genSerials(from,to);
-  if(!serials.length){showAlert('sim','❌ نطاق السيريل غلط','err');return}
-  const exist=new Set(DB.sim.map(x=>x.serial));
-  let added=0,skipped=0;
-  serials.forEach(s=>{if(exist.has(s)){skipped++;return}DB.sim.push({serial:s,carton:name,date:td(),added:ts()});added++;});
-  save('sim',DB.sim);
-  showAlert('sim',`✅ تم إضافة ${added} شريحة${skipped?` — تم تجاهل ${skipped} مكررة`:''}`);
-  ['sim-name','sim-from','sim-to'].forEach(id=>document.getElementById(id).value='');
+function addSimCarton() {
+  const name = document.getElementById('sim-name').value.trim();
+  if (!name) { showAlert('sim', '⚠️ اكتب اسم الكرتونة', 'err'); return; }
+  const ranges = getAllRanges().filter(r => r.from && r.to);
+  if (!ranges.length) { showAlert('sim', '⚠️ أضف نطاق واحد على الأقل', 'err'); return; }
+  const exist = new Set(DB.sim.map(x => x.serial));
+  let added = 0, skipped = 0;
+  ranges.forEach(r => {
+    const serials = genSerials(r.from, r.to);
+    serials.forEach(s => {
+      if (exist.has(s)) { skipped++; return; }
+      DB.sim.push({serial: s, carton: name, date: td(), added: ts()});
+      exist.add(s);
+      added++;
+    });
+  });
+  save('sim', DB.sim);
+  showAlert('sim', `✅ تم إضافة ${added} شريحة${skipped ? ` — تم تجاهل ${skipped} مكررة` : ''}`);
+  document.getElementById('sim-name').value = '';
+  document.getElementById('ranges-container').innerHTML = '';
+  rangeCount = 0;
+  addRangeRow();
   document.getElementById('sim-preview').classList.remove('show');
   refreshCartonFilter();
   renderAll();
@@ -807,20 +865,39 @@ const ROW_COLORS=['FFE8F2FF','FFFFFFFF'];
 function buildSim(){
   const ws={};
   const hbg='FF0D47A1',hfg='FFFFFFFF';
-  const headers=['#','السيريل نمبر','اسم الكرتونة','تاريخ الإضافة'];
-  logoRows(ws,headers.length,'📱 مخزن الشرايح',`الإجمالي: ${DB.sim.length} شريحة`,hbg,hfg);
-  headerRow(ws,headers,5,hbg,hfg);
-  DB.sim.forEach((r,i)=>{
-    const row=6+i,bg=ROW_COLORS[i%2];
-    ws['A'+row]=C(i+1,false,bg,'FF333333','center');
-    ws['B'+row]=C(r.serial,false,bg,'FF1565C0','center');
-    ws['C'+row]=C(r.carton||'-',false,bg,'FF333333');
-    ws['D'+row]=C(r.date||'-',false,bg,'FF666666','center');
+  const headers=['#','اسم الكرتونة','من (أول سيريل)','لـ (آخر سيريل)','عدد الشرايح','تاريخ الإضافة'];
+
+  // Group by carton
+  const cartonMap=new Map();
+  DB.sim.forEach(r=>{
+    const key=r.carton||'بدون كرتونة';
+    if(!cartonMap.has(key))cartonMap.set(key,[]);
+    cartonMap.get(key).push(r);
   });
-  const last=Math.max(5,5+DB.sim.length);
-  ws['!ref']='A1:D'+last;
-  ws['!cols']=[{wch:6},{wch:28},{wch:26},{wch:24}];
-  ws['!rows']=[{hpt:28},{hpt:18},{hpt:16},{hpt:10},{hpt:22},...Array(DB.sim.length).fill({hpt:18})];
+  const groups=[];
+  cartonMap.forEach((items,cartonName)=>{
+    const sorted=[...items].sort((a,b)=>{
+      try{const na=BigInt(a.serial.replace(/\D/g,'')||'0'),nb=BigInt(b.serial.replace(/\D/g,'')||'0');return na<nb?-1:na>nb?1:0;}catch{return 0;}
+    });
+    groups.push({carton:cartonName,from:sorted[0].serial,to:sorted[sorted.length-1].serial,count:sorted.length,date:sorted[0].date||'-',single:sorted.length===1});
+  });
+
+  logoRows(ws,headers.length,'📱 مخزن الشرايح',`الإجمالي: ${DB.sim.length} شريحة — ${groups.length} كرتونة`,hbg,hfg);
+  headerRow(ws,headers,5,hbg,hfg);
+  groups.forEach((g,i)=>{
+    const row=6+i,bg=ROW_COLORS[i%2];
+    const noCarton=g.carton==='بدون كرتونة';
+    ws['A'+row]=C(i+1,false,bg,'FF333333','center');
+    ws['B'+row]=C(g.carton,true,bg,noCarton?'FFB45309':'FF0D47A1');
+    ws['C'+row]=C(g.from,false,bg,'FF1565C0','center');
+    ws['D'+row]=C(g.single?'-':g.to,false,bg,'FF1565C0','center');
+    ws['E'+row]=C(g.count,true,bg,'FF1B5E20','center');
+    ws['F'+row]=C(g.date,false,bg,'FF666666','center');
+  });
+  const lastRow=Math.max(5,5+groups.length);
+  ws['!ref']='A1:F'+lastRow;
+  ws['!cols']=[{wch:5},{wch:30},{wch:28},{wch:28},{wch:12},{wch:22}];
+  ws['!rows']=[{hpt:28},{hpt:18},{hpt:16},{hpt:10},{hpt:22},...Array(groups.length).fill({hpt:20})];
   return ws;
 }
 
@@ -926,6 +1003,7 @@ function exportAll(){
 }
 
 initDB();
+addRangeRow();
 </script>
 </body>
 </html>
