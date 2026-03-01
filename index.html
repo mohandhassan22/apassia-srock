@@ -108,7 +108,7 @@ tr:hover td{background:rgba(0,89,200,.07)}
   </div>
   <nav class="nav">
     <button class="nav-btn active" onclick="showPage('inventory',this)">🏪 المخزن</button>
-    <button class="nav-btn" onclick="showPage('sales',this)">💸 المبيعات</button>
+    <button class="nav-btn" onclick="showPage('sales',this)">خروج💾</button>
     <button class="nav-btn" onclick="showPage('reports',this)">📊 التقارير</button>
   </nav>
   <div id="sync-status" style="font-size:12px;font-weight:700;color:var(--muted);min-width:160px;text-align:center;">⏳ جاري التحميل...</div>
@@ -310,7 +310,7 @@ tr:hover td{background:rgba(0,89,200,.07)}
   <div class="stats-grid" id="stats-sales"></div>
   <div class="grid2" style="margin-bottom:22px">
     <div class="card">
-      <div class="card-title">💸 تسجيل بيعة جديدة</div>
+      <div class="card-title">💾تسجيل الخروج من المخزن</div>
       <div id="sale-alert" class="alert"></div>
       <div class="fg">
         <label>نوع المنتج</label>
@@ -330,7 +330,7 @@ tr:hover td{background:rgba(0,89,200,.07)}
       </div>
       <div class="fg"><label>اسم العميل (اختياري)</label><input id="sale-customer" placeholder="اسم العميل..."></div>
       <div class="fg"><label>ملاحظات (اختياري)</label><input id="sale-notes" placeholder="ملاحظات..."></div>
-      <button class="btn btn-primary" onclick="addSale()" style="background:linear-gradient(135deg,#065f46,var(--success))">✅ تسجيل البيعة ومسحها من المخزن</button>
+      <button class="btn btn-primary" onclick="addSale()" style="background:linear-gradient(135deg,#065f46,var(--success))">✅ تسجيل الخروج</button>
     </div>
     <div class="card" style="display:flex;flex-direction:column;justify-content:center;align-items:center;gap:16px;padding:32px">
       <div style="font-size:56px">🛒</div>
