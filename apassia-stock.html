@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Apassia Stock Room</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#080d18;--surface:#0f1724;--card:#141e2f;--border:#1a3352;
+  --accent:#00cfff;--accent2:#0059c8;--text:#dde6f0;--muted:#556070;
+  --danger:#f44c4c;--warn:#ffb300;--success:#00c87a;--purple:#9c6cff;--pink:#ff6cb0;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;
+  background-image:radial-gradient(ellipse 60% 40% at 15% 10%,rgba(0,89,200,.1) 0%,transparent 60%),
+  radial-gradient(ellipse 50% 40% at 85% 90%,rgba(0,207,255,.06) 0%,transparent 60%);}
+.header{background:linear-gradient(180deg,rgba(12,24,42,.98),rgba(8,14,26,.95));border-bottom:1px solid var(--border);
+  padding:14px 28px;display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:200;backdrop-filter:blur(16px);box-shadow:0 4px 32px rgba(0,0,0,.5);}
+.logo{display:flex;align-items:center;gap:14px}
+.logo-icon{width:46px;height:46px;background:linear-gradient(135deg,#0040a0,var(--accent));border-radius:12px;
+  display:flex;align-items:center;justify-content:center;font-size:24px;box-shadow:0 0 24px rgba(0,207,255,.35);}
+.logo-name{font-size:20px;font-weight:900;letter-spacing:1.5px;color:#fff}
+.logo-name span{color:var(--accent)}
+.logo-sub{font-size:11px;color:var(--muted);letter-spacing:.5px;margin-top:1px}
+.nav{display:flex;gap:4px;background:rgba(0,0,0,.35);padding:4px;border-radius:12px;border:1px solid var(--border)}
+.nav-btn{padding:9px 20px;border:none;border-radius:9px;background:transparent;color:var(--muted);
+  cursor:pointer;font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;transition:all .22s;
+  display:flex;align-items:center;gap:6px;}
+.nav-btn.active,.nav-btn:hover{background:linear-gradient(135deg,var(--accent2),#0080e0);color:#fff;box-shadow:0 0 16px rgba(0,89,200,.45);}
+.main{padding:28px;max-width:1440px;margin:0 auto}
+.page{display:none}.page.active{display:block}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:14px;margin-bottom:28px;}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px 16px;
+  position:relative;overflow:hidden;transition:transform .2s,box-shadow .2s;cursor:default;}
+.stat-card:hover{transform:translateY(-3px);box-shadow:0 8px 28px rgba(0,0,0,.3)}
+.stat-top{height:3px;position:absolute;top:0;left:0;right:0;border-radius:14px 14px 0 0}
+.stat-icon{font-size:28px;margin-bottom:8px;display:block}
+.stat-label{font-size:11px;color:var(--muted);font-weight:700;letter-spacing:.5px;margin-bottom:4px}
+.stat-val{font-size:30px;font-weight:900;line-height:1}
+.tab-nav{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:22px;}
+.tab-btn{padding:11px 22px;background:none;border:none;color:var(--muted);cursor:pointer;
+  font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;border-bottom:3px solid transparent;
+  margin-bottom:-2px;transition:all .2s;display:flex;align-items:center;gap:6px;}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab-btn:hover:not(.active){color:var(--text)}
+.tab-content{display:none}.tab-content.active{display:block}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:22px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:22px;box-shadow:0 6px 24px rgba(0,0,0,.25);}
+.card-title{font-size:14px;font-weight:800;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;}
+.pill{font-size:10px;padding:3px 10px;border-radius:20px;font-weight:700;background:var(--accent2);color:#fff;}
+.pill.green{background:var(--success)}.pill.orange{background:var(--warn);color:#000}.pill.purple{background:var(--purple)}.pill.pink{background:var(--pink)}
+.fg{margin-bottom:14px}.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+label{display:block;font-size:11px;color:var(--muted);margin-bottom:6px;font-weight:700;letter-spacing:.3px}
+input,select,textarea{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:9px;
+  color:var(--text);padding:10px 13px;font-family:'Cairo',sans-serif;font-size:13px;outline:none;transition:border-color .2s,box-shadow .2s;}
+input:focus,select:focus,textarea:focus{border-color:var(--accent2);box-shadow:0 0 0 3px rgba(0,89,200,.2);}
+textarea{resize:vertical;min-height:90px}
+select option{background:var(--surface)}
+.btn{padding:10px 18px;border:none;border-radius:9px;cursor:pointer;font-family:'Cairo',sans-serif;
+  font-size:13px;font-weight:800;transition:all .2s;display:inline-flex;align-items:center;justify-content:center;gap:7px;}
+.btn-primary{background:linear-gradient(135deg,var(--accent2),#1a8aff);color:#fff;width:100%;box-shadow:0 4px 18px rgba(0,89,200,.35);}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 24px rgba(0,89,200,.5)}
+.btn-blue2{background:linear-gradient(135deg,#1a3a7a,#2a5abf);color:#fff;width:100%;margin-top:8px}
+.btn-danger{background:linear-gradient(135deg,#b91c1c,var(--danger));color:#fff;font-size:11px;padding:5px 11px}
+.btn-export{background:linear-gradient(135deg,#b45309,#f59e0b);color:#fff;font-size:12px;padding:8px 16px;}
+.btn-sm{padding:6px 13px;font-size:12px}
+.mt-8{margin-top:8px}
+.alert{padding:11px 15px;border-radius:9px;font-size:13px;margin-bottom:14px;display:none;font-weight:600}
+.alert.show{display:block}
+.alert-ok{background:rgba(0,200,122,.12);border:1px solid var(--success);color:var(--success)}
+.alert-err{background:rgba(244,76,76,.12);border:1px solid var(--danger);color:var(--danger)}
+.srow{display:flex;gap:10px;margin-bottom:14px;align-items:center;flex-wrap:wrap}
+.srow input{max-width:260px}
+.twrap{overflow-x:auto;border-radius:11px;border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse}
+thead tr{background:linear-gradient(90deg,rgba(0,89,200,.18),rgba(0,89,200,.08))}
+th{padding:12px 14px;text-align:right;font-size:11px;color:var(--muted);font-weight:800;white-space:nowrap;border-bottom:1px solid var(--border);letter-spacing:.4px}
+td{padding:10px 14px;font-size:12px;border-bottom:1px solid rgba(26,51,82,.4);white-space:nowrap}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(0,89,200,.07)}
+.serial{font-family:monospace;font-size:11px;letter-spacing:.5px;color:var(--accent)}
+.empty{text-align:center;padding:44px 20px;color:var(--muted)}
+.empty .ei{font-size:38px;margin-bottom:10px}
+.rpreview{background:rgba(0,207,255,.07);border:1px solid rgba(0,207,255,.2);border-radius:9px;padding:10px 14px;font-size:12px;color:var(--accent);margin-top:8px;display:none;font-weight:600;}
+.rpreview.show{display:block}
+.sale-type{font-size:10px;padding:2px 8px;border-radius:12px;font-weight:700}
+.st-sim{background:rgba(0,207,255,.15);color:var(--accent)}
+.st-vdsl{background:rgba(244,76,76,.15);color:var(--danger)}
+.st-ont{background:rgba(0,200,122,.15);color:var(--success)}
+.st-air{background:rgba(255,179,0,.15);color:var(--warn)}
+.st-mifi{background:rgba(156,108,255,.15);color:var(--purple)}
+.divider{margin:14px 0;border-top:1px solid var(--border);padding-top:14px}
+@media(max-width:768px){.grid2{grid-template-columns:1fr}.row2{grid-template-columns:1fr}.srow input{max-width:100%}}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="logo">
+    <div class="logo-icon">📦</div>
+    <div>
+      <div class="logo-name">Apassia <span>Stock</span> Room</div>
+      <div class="logo-sub">نظام إدارة المخزن والمبيعات</div>
+    </div>
+  </div>
+  <nav class="nav">
+    <button class="nav-btn active" onclick="showPage('inventory',this)">🏪 المخزن</button>
+    <button class="nav-btn" onclick="showPage('sales',this)">💸 المبيعات</button>
+    <button class="nav-btn" onclick="showPage('reports',this)">📊 التقارير</button>
+  </nav>
+  <div id="sync-status" style="font-size:12px;font-weight:700;color:var(--muted);min-width:160px;text-align:center;">⏳ جاري التحميل...</div>
+</header>
+
+<div class="main">
+
+<!-- ══ INVENTORY ══ -->
+<div id="page-inventory" class="page active">
+  <div class="stats-grid" id="stats-inv"></div>
+  <div class="tab-nav">
+    <button class="tab-btn active" onclick="switchTab('sim',this)">📱 شرايح</button>
+    <button class="tab-btn" onclick="switchTab('vdsl',this)">🌐 VDSL</button>
+    <button class="tab-btn" onclick="switchTab('ont',this)">🔌 ONT</button>
+    <button class="tab-btn" onclick="switchTab('air',this)">📡 We Air</button>
+    <button class="tab-btn" onclick="switchTab('mifi',this)">📶 MiFi</button>
+  </div>
+
+  <!-- SIM -->
+  <div id="tab-sim" class="tab-content active">
+    <div class="grid2" style="margin-bottom:22px">
+
+      <!-- كرتونة -->
+      <div class="card">
+        <div class="card-title">📦 إضافة كرتونة شرايح <span class="pill">بالنطاق تلقائي</span></div>
+        <div id="sim-alert" class="alert"></div>
+        <div class="fg"><label>اسم / رقم الكرتونة</label><input id="sim-name" placeholder="مثال: كرتونة يناير - بلوت 1"></div>
+        <div class="row2">
+          <div class="fg"><label>أول سيريل</label><input id="sim-from" placeholder="8920010000000001" oninput="previewSim()"></div>
+          <div class="fg"><label>آخر سيريل</label><input id="sim-to" placeholder="8920010000000100" oninput="previewSim()"></div>
+        </div>
+        <div id="sim-preview" class="rpreview"></div>
+        <button class="btn btn-primary mt-8" onclick="addSimCarton()">➕ إضافة الكرتونة للمخزن</button>
+      </div>
+
+      <!-- شريحة بدون كرتونة -->
+      <div class="card">
+        <div class="card-title">📱 إضافة شريحة بدون كرتونة <span class="pill orange">مفردة أو متعددة</span></div>
+        <div id="sim-single-alert" class="alert"></div>
+
+        <!-- مفردة -->
+        <div class="fg"><label>سيريل الشريحة</label><input id="sim-single-serial" placeholder="أدخل السيريل مباشرة..."></div>
+        <button class="btn btn-primary" onclick="addSingleSim()" style="background:linear-gradient(135deg,#1a5c3a,var(--success))">➕ إضافة شريحة واحدة</button>
+
+        <div class="divider">
+          <label>📋 إضافة متعددة — كل سيريل في سطر</label>
+          <textarea id="sim-bulk" placeholder="8920010000000101&#10;8920010000000102&#10;8920010000000103..."></textarea>
+          <button class="btn btn-blue2" onclick="bulkAddSim()">📋 إضافة المتعدد</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- جدول المخزن -->
+    <div class="card">
+      <div class="card-title">📋 مخزن الشرايح <span class="pill green" id="sim-badge">0</span></div>
+      <div class="srow">
+        <input id="sim-search" placeholder="🔍 بحث بالسيريل أو الكرتونة..." oninput="renderTbl('sim')">
+        <select id="sim-filter-carton" onchange="renderTbl('sim')" style="max-width:200px">
+          <option value="">كل الكرتونات</option>
+          <option value="__nocarton__">بدون كرتونة</option>
+        </select>
+        <button class="btn btn-export btn-sm" onclick="exportSection('sim')">⬇ Excel</button>
+      </div>
+      <div class="twrap"><table>
+        <thead><tr><th>#</th><th>السيريل</th><th>الكرتونة</th><th>التاريخ</th><th>🗑</th></tr></thead>
+        <tbody id="sim-tbl"></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- VDSL -->
+  <div id="tab-vdsl" class="tab-content">
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">🌐 إضافة راوتر VDSL</div>
+        <div id="vdsl-alert" class="alert"></div>
+        <div class="row2">
+          <div class="fg"><label>السيريل</label><input id="vdsl-serial" placeholder="أدخل السيريل..."></div>
+          <div class="fg"><label>الموديل</label><input id="vdsl-model" placeholder="مثال: HG630v3"></div>
+        </div>
+        <button class="btn btn-primary" onclick="addDevice('vdsl')">➕ إضافة راوتر</button>
+        <div class="divider">
+          <label>📋 إضافة متعددة — كل سيريل في سطر</label>
+          <textarea id="vdsl-bulk" placeholder="serial1&#10;serial2&#10;serial3..."></textarea>
+          <div class="fg mt-8"><label>الموديل (للكل)</label><input id="vdsl-bulk-model" placeholder="الموديل..."></div>
+          <button class="btn btn-blue2" onclick="bulkAdd('vdsl')">📋 إضافة المتعدد</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">📋 مخزن VDSL <span class="pill" style="background:var(--danger)" id="vdsl-badge">0</span></div>
+        <div class="srow">
+          <input id="vdsl-search" placeholder="🔍 بحث..." oninput="renderTbl('vdsl')">
+          <button class="btn btn-export btn-sm" onclick="exportSection('vdsl')">⬇ Excel</button>
+        </div>
+        <div class="twrap"><table>
+          <thead><tr><th>#</th><th>السيريل</th><th>الموديل</th><th>التاريخ</th><th>🗑</th></tr></thead>
+          <tbody id="vdsl-tbl"></tbody></table></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ONT -->
+  <div id="tab-ont" class="tab-content">
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">🔌 إضافة راوتر ONT</div>
+        <div id="ont-alert" class="alert"></div>
+        <div class="row2">
+          <div class="fg"><label>السيريل</label><input id="ont-serial" placeholder="أدخل السيريل..."></div>
+          <div class="fg"><label>الموديل</label><input id="ont-model" placeholder="مثال: HG8145X6"></div>
+        </div>
+        <button class="btn btn-primary" onclick="addDevice('ont')">➕ إضافة ONT</button>
+        <div class="divider">
+          <label>📋 إضافة متعددة — كل سيريل في سطر</label>
+          <textarea id="ont-bulk" placeholder="serial1&#10;serial2&#10;serial3..."></textarea>
+          <div class="fg mt-8"><label>الموديل (للكل)</label><input id="ont-bulk-model" placeholder="الموديل..."></div>
+          <button class="btn btn-blue2" onclick="bulkAdd('ont')">📋 إضافة المتعدد</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">📋 مخزن ONT <span class="pill green" id="ont-badge">0</span></div>
+        <div class="srow">
+          <input id="ont-search" placeholder="🔍 بحث..." oninput="renderTbl('ont')">
+          <button class="btn btn-export btn-sm" onclick="exportSection('ont')">⬇ Excel</button>
+        </div>
+        <div class="twrap"><table>
+          <thead><tr><th>#</th><th>السيريل</th><th>الموديل</th><th>التاريخ</th><th>🗑</th></tr></thead>
+          <tbody id="ont-tbl"></tbody></table></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AIR -->
+  <div id="tab-air" class="tab-content">
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">📡 إضافة We Air</div>
+        <div id="air-alert" class="alert"></div>
+        <div class="row2">
+          <div class="fg"><label>السيريل</label><input id="air-serial" placeholder="أدخل السيريل..."></div>
+          <div class="fg"><label>الموديل</label><input id="air-model" placeholder="الموديل..."></div>
+        </div>
+        <button class="btn btn-primary" onclick="addDevice('air')">➕ إضافة We Air</button>
+        <div class="divider">
+          <label>📋 إضافة متعددة — كل سيريل في سطر</label>
+          <textarea id="air-bulk" placeholder="serial1&#10;serial2&#10;serial3..."></textarea>
+          <div class="fg mt-8"><label>الموديل (للكل)</label><input id="air-bulk-model" placeholder="الموديل..."></div>
+          <button class="btn btn-blue2" onclick="bulkAdd('air')">📋 إضافة المتعدد</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">📋 مخزن We Air <span class="pill orange" id="air-badge">0</span></div>
+        <div class="srow">
+          <input id="air-search" placeholder="🔍 بحث..." oninput="renderTbl('air')">
+          <button class="btn btn-export btn-sm" onclick="exportSection('air')">⬇ Excel</button>
+        </div>
+        <div class="twrap"><table>
+          <thead><tr><th>#</th><th>السيريل</th><th>الموديل</th><th>التاريخ</th><th>🗑</th></tr></thead>
+          <tbody id="air-tbl"></tbody></table></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MIFI -->
+  <div id="tab-mifi" class="tab-content">
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">📶 إضافة MiFi</div>
+        <div id="mifi-alert" class="alert"></div>
+        <div class="row2">
+          <div class="fg"><label>السيريل</label><input id="mifi-serial" placeholder="أدخل السيريل..."></div>
+          <div class="fg"><label>الموديل</label><input id="mifi-model" placeholder="الموديل..."></div>
+        </div>
+        <button class="btn btn-primary" onclick="addDevice('mifi')">➕ إضافة MiFi</button>
+        <div class="divider">
+          <label>📋 إضافة متعددة — كل سيريل في سطر</label>
+          <textarea id="mifi-bulk" placeholder="serial1&#10;serial2&#10;serial3..."></textarea>
+          <div class="fg mt-8"><label>الموديل (للكل)</label><input id="mifi-bulk-model" placeholder="الموديل..."></div>
+          <button class="btn btn-blue2" onclick="bulkAdd('mifi')">📋 إضافة المتعدد</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">📋 مخزن MiFi <span class="pill purple" id="mifi-badge">0</span></div>
+        <div class="srow">
+          <input id="mifi-search" placeholder="🔍 بحث..." oninput="renderTbl('mifi')">
+          <button class="btn btn-export btn-sm" onclick="exportSection('mifi')">⬇ Excel</button>
+        </div>
+        <div class="twrap"><table>
+          <thead><tr><th>#</th><th>السيريل</th><th>الموديل</th><th>التاريخ</th><th>🗑</th></tr></thead>
+          <tbody id="mifi-tbl"></tbody></table></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SALES ══ -->
+<div id="page-sales" class="page">
+  <div class="stats-grid" id="stats-sales"></div>
+  <div class="grid2" style="margin-bottom:22px">
+    <div class="card">
+      <div class="card-title">💸 تسجيل بيعة جديدة</div>
+      <div id="sale-alert" class="alert"></div>
+      <div class="fg">
+        <label>نوع المنتج</label>
+        <select id="sale-type">
+          <option value="">-- اختر النوع --</option>
+          <option value="sim">📱 شريحة</option>
+          <option value="vdsl">🌐 راوتر VDSL</option>
+          <option value="ont">🔌 راوتر ONT</option>
+          <option value="air">📡 We Air</option>
+          <option value="mifi">📶 MiFi</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>السيريل نمبر</label>
+        <input id="sale-serial" placeholder="اكتب السيريل هنا..." autocomplete="off" oninput="checkSerialLive()">
+        <div id="sale-serial-status" style="margin-top:6px;font-size:12px;font-weight:700;display:none"></div>
+      </div>
+      <div class="fg"><label>اسم العميل (اختياري)</label><input id="sale-customer" placeholder="اسم العميل..."></div>
+      <div class="fg"><label>ملاحظات (اختياري)</label><input id="sale-notes" placeholder="ملاحظات..."></div>
+      <button class="btn btn-primary" onclick="addSale()" style="background:linear-gradient(135deg,#065f46,var(--success))">✅ تسجيل البيعة ومسحها من المخزن</button>
+    </div>
+    <div class="card" style="display:flex;flex-direction:column;justify-content:center;align-items:center;gap:16px;padding:32px">
+      <div style="font-size:56px">🛒</div>
+      <div style="text-align:center;font-size:13px;color:var(--muted);line-height:2">لما تسجل بيعة<br>السيريل بيتمسح تلقائياً من المخزن<br>وبيتسجل في سجل المبيعات<br>وتقدر ترجعه بزر ↩</div>
+      <div style="display:flex;flex-direction:column;gap:8px;width:100%">
+        <button class="btn btn-export" onclick="exportSection('sales')">⬇ تصدير المبيعات Excel</button>
+        <button class="btn btn-export" style="background:linear-gradient(135deg,#6b21a8,#a855f7)" onclick="exportAll()">🗂 تصدير الكل في ملف واحد</button>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">📋 سجل المبيعات <span class="pill green" id="sales-badge">0</span></div>
+    <div class="srow">
+      <input id="sales-search" placeholder="🔍 بحث بالسيريل أو العميل..." oninput="renderSalesTbl()" style="max-width:320px">
+      <select id="sales-filter" onchange="renderSalesTbl()" style="max-width:150px">
+        <option value="">كل الأنواع</option>
+        <option value="sim">شرايح</option><option value="vdsl">VDSL</option>
+        <option value="ont">ONT</option><option value="air">We Air</option><option value="mifi">MiFi</option>
+      </select>
+      <button class="btn btn-export btn-sm" onclick="exportSection('sales')">⬇ Excel</button>
+    </div>
+    <div class="twrap"><table>
+      <thead><tr><th>#</th><th>النوع</th><th>السيريل</th><th>العميل</th><th>الموديل/الكرتونة</th><th>الملاحظات</th><th>تاريخ البيع</th><th>↩</th></tr></thead>
+      <tbody id="sales-tbl"></tbody></table></div>
+  </div>
+</div>
+
+<!-- ══ REPORTS ══ -->
+<div id="page-reports" class="page">
+  <div class="stats-grid" id="stats-rep"></div>
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">📦 تصدير المخزن</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button class="btn btn-export" onclick="exportSection('sim')">📱 تصدير الشرايح</button>
+        <button class="btn btn-export" onclick="exportSection('vdsl')">🌐 تصدير VDSL</button>
+        <button class="btn btn-export" onclick="exportSection('ont')">🔌 تصدير ONT</button>
+        <button class="btn btn-export" onclick="exportSection('air')">📡 تصدير We Air</button>
+        <button class="btn btn-export" onclick="exportSection('mifi')">📶 تصدير MiFi</button>
+        <button class="btn btn-export" style="background:linear-gradient(135deg,#6b21a8,#a855f7)" onclick="exportInventoryAll()">📋 كل المخزن في ملف واحد</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">💸 تصدير المبيعات</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button class="btn btn-export" style="background:linear-gradient(135deg,#065f46,#059669)" onclick="exportSection('sales')">📋 تصدير المبيعات</button>
+        <button class="btn btn-export" style="background:linear-gradient(135deg,#6b21a8,#a855f7)" onclick="exportAll()">🗂 كل شيء في ملف واحد</button>
+      </div>
+      <div style="margin-top:18px;padding:16px;background:rgba(0,207,255,.06);border-radius:10px;border:1px solid rgba(0,207,255,.15);font-size:12px;color:var(--muted);line-height:2.1">
+        ✅ هيدر ملون لكل قسم<br>
+        ✅ صفوف بديلة الألوان<br>
+        ✅ كل قسم في شيت لوحده<br>
+        ✅ الأعمدة متناسبة<br>
+        ✅ ملف Excel احترافي جاهز للطباعة
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- main -->
+
+<script>
+// ═══ SUPABASE CONFIG ═══
+const SUPABASE_URL = 'https://evfmloukhzlbwrpklquj.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_shDaiLtR7ZPm65qo0HHz5w_czqz29ah';
+
+async function sbGet(table) {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=*&order=created_at.asc`, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return await res.json();
+  } catch(e) {
+    console.warn('Supabase GET failed:', e);
+    return null;
+  }
+}
+
+async function sbUpsert(table, rows) {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates'
+      },
+      body: JSON.stringify(rows)
+    });
+    if (!res.ok) console.warn('Supabase upsert failed:', await res.text());
+  } catch(e) { console.warn('Supabase upsert error:', e); }
+}
+
+async function sbDelete(table, serial) {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?serial=eq.${encodeURIComponent(serial)}`, {
+      method: 'DELETE',
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+    });
+    if (!res.ok) console.warn('Supabase delete failed:', await res.text());
+  } catch(e) { console.warn('Supabase delete error:', e); }
+}
+
+async function sbDeleteById(table, id) {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+    });
+    if (!res.ok) console.warn('Supabase delete failed:', await res.text());
+  } catch(e) { console.warn('Supabase delete error:', e); }
+}
+
+// ═══ DATA ═══
+const KEYS={sim:'asr_sim',vdsl:'asr_vdsl',ont:'asr_ont',air:'asr_air',mifi:'asr_mifi',sales:'asr_sales'};
+function loadLocal(k){try{return JSON.parse(localStorage.getItem(KEYS[k])||'[]')}catch{return[]}}
+function saveLocal(k,d){try{localStorage.setItem(KEYS[k],JSON.stringify(d))}catch{}}
+
+// Map table names
+const TABLE={sim:'inventory_sim',vdsl:'inventory_vdsl',ont:'inventory_ont',air:'inventory_air',mifi:'inventory_mifi',sales:'sales'};
+
+// sync: push new items to Supabase
+async function save(k, d) {
+  saveLocal(k, d);
+  // Upsert all current items
+  if (!d || !d.length) return;
+  const rows = d.map(r => {
+    if (k === 'sales') return {
+      id: r.id,
+      type: r.type,
+      serial: r.serial,
+      customer: r.customer || null,
+      notes: r.notes || null,
+      model: r.model || null,
+      carton: r.carton || null,
+      date: r.date || null,
+      created_at: new Date().toISOString()
+    };
+    return {
+      serial: r.serial,
+      carton: r.carton || null,
+      model: r.model || null,
+      date: r.date || null,
+      created_at: new Date().toISOString()
+    };
+  });
+  await sbUpsert(TABLE[k], rows);
+}
+
+const DB={sim:[],vdsl:[],ont:[],air:[],mifi:[],sales:[]};
+
+// Load from Supabase on init, fallback to localStorage
+async function initDB() {
+  const syncStatus = document.getElementById('sync-status');
+  if(syncStatus) { syncStatus.textContent='⏳ جاري التحميل...'; syncStatus.style.color='var(--warn)'; }
+  
+  let fromSupabase = false;
+  for (const k of Object.keys(DB)) {
+    const rows = await sbGet(TABLE[k]);
+    if (rows !== null) {
+      if (k === 'sales') {
+        DB[k] = rows.map(r => ({id:r.id,type:r.type,serial:r.serial,customer:r.customer,notes:r.notes,model:r.model,carton:r.carton,date:r.date}));
+      } else {
+        DB[k] = rows.map(r => ({serial:r.serial,carton:r.carton,model:r.model,date:r.date}));
+      }
+      fromSupabase = true;
+    } else {
+      DB[k] = loadLocal(k);
+    }
+  }
+  
+  if(syncStatus) {
+    if(fromSupabase) { syncStatus.textContent='🟢 متصل بـ Supabase'; syncStatus.style.color='var(--success)'; }
+    else { syncStatus.textContent='🔴 وضع محلي (offline)'; syncStatus.style.color='var(--danger)'; }
+  }
+  renderAll();
+}
+
+// Override delItem to also delete from Supabase
+const _origDelItem = window.delItem;
+const LABELS={sim:'شريحة',vdsl:'VDSL',ont:'ONT',air:'We Air',mifi:'MiFi'};
+function ts(){return new Date().toLocaleString('ar-EG')}
+function td(){return new Date().toLocaleDateString('ar-EG')}
+
+// ═══ NAV ═══
+function showPage(p,btn){
+  document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(e=>e.classList.remove('active'));
+  document.getElementById('page-'+p).classList.add('active');
+  btn.classList.add('active');
+  renderAll();
+}
+function switchTab(t,btn){
+  document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(e=>e.classList.remove('active'));
+  document.getElementById('tab-'+t).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ═══ ALERT ═══
+function showAlert(id,msg,type='ok'){
+  const el=document.getElementById(id+'-alert');
+  el.className='alert show alert-'+(type==='ok'?'ok':'err');
+  el.textContent=msg;
+  setTimeout(()=>el.classList.remove('show'),3500);
+}
+
+// ═══ SIM ═══
+function previewSim(){
+  const f=document.getElementById('sim-from').value.trim();
+  const t=document.getElementById('sim-to').value.trim();
+  const p=document.getElementById('sim-preview');
+  if(!f||!t){p.classList.remove('show');return}
+  try{
+    const n=BigInt(f.replace(/\D/g,'')||0);
+    const m=BigInt(t.replace(/\D/g,'')||0);
+    const c=m-n+1n;
+    p.className='rpreview show';
+    p.style.color=c>0n?'var(--accent)':'var(--danger)';
+    p.textContent=c>0n?`✅ هيتم إضافة ${c} شريحة — من ${f} لحد ${t}`:'❌ السيريل الأول أكبر من الأخير!';
+  }catch{p.classList.remove('show')}
+}
+
+function genSerials(from,to){
+  const serials=[];
+  const numStr=from.match(/\d+$/);
+  if(!numStr)return[from,to];
+  const prefix=from.slice(0,from.lastIndexOf(numStr[0]));
+  const len=numStr[0].length;
+  const f=BigInt(numStr[0]);
+  const tNum=to.match(/\d+$/);
+  const t=tNum?BigInt(tNum[0]):f;
+  for(let i=f;i<=t;i++) serials.push(prefix+String(i).padStart(len,'0'));
+  return serials;
+}
+
+function addSimCarton(){
+  const name=document.getElementById('sim-name').value.trim();
+  const from=document.getElementById('sim-from').value.trim();
+  const to=document.getElementById('sim-to').value.trim();
+  if(!name||!from||!to){showAlert('sim','⚠️ اكتب اسم الكرتونة والسيريل الأول والأخير','err');return}
+  const serials=genSerials(from,to);
+  if(!serials.length){showAlert('sim','❌ نطاق السيريل غلط','err');return}
+  const exist=new Set(DB.sim.map(x=>x.serial));
+  let added=0,skipped=0;
+  serials.forEach(s=>{if(exist.has(s)){skipped++;return}DB.sim.push({serial:s,carton:name,date:td(),added:ts()});added++;});
+  save('sim',DB.sim);
+  showAlert('sim',`✅ تم إضافة ${added} شريحة${skipped?` — تم تجاهل ${skipped} مكررة`:''}`);
+  ['sim-name','sim-from','sim-to'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('sim-preview').classList.remove('show');
+  refreshCartonFilter();
+  renderAll();
+}
+
+// ═══ SIM SINGLE / BULK ═══
+function addSingleSim(){
+  const s=document.getElementById('sim-single-serial').value.trim();
+  if(!s){showAlert('sim-single','⚠️ اكتب السيريل النمبر','err');return}
+  if(DB.sim.find(x=>x.serial===s)){showAlert('sim-single','⚠️ السيريل موجود بالفعل في المخزن','err');return}
+  DB.sim.push({serial:s,carton:'بدون كرتونة',date:td(),added:ts()});
+  save('sim',DB.sim);
+  showAlert('sim-single','✅ تم إضافة الشريحة بنجاح');
+  document.getElementById('sim-single-serial').value='';
+  refreshCartonFilter();renderAll();
+}
+
+function bulkAddSim(){
+  const raw=document.getElementById('sim-bulk').value.trim();
+  if(!raw){showAlert('sim-single','⚠️ الحقل فاضي','err');return}
+  const lines=raw.split('\n').map(l=>l.trim()).filter(Boolean);
+  const exist=new Set(DB.sim.map(x=>x.serial));
+  let added=0,skipped=0;
+  lines.forEach(s=>{if(exist.has(s)){skipped++;return}DB.sim.push({serial:s,carton:'بدون كرتونة',date:td(),added:ts()});added++;});
+  save('sim',DB.sim);
+  showAlert('sim-single',`✅ تم إضافة ${added} شريحة${skipped?` — تجاهل ${skipped} مكررة`:''}`);
+  document.getElementById('sim-bulk').value='';
+  refreshCartonFilter();renderAll();
+}
+
+function refreshCartonFilter(){
+  const sel=document.getElementById('sim-filter-carton');
+  if(!sel)return;
+  const cartons=[...new Set(DB.sim.filter(x=>x.carton&&x.carton!=='بدون كرتونة').map(x=>x.carton))].sort();
+  const cur=sel.value;
+  sel.innerHTML='<option value="">كل الكرتونات</option><option value="__nocarton__">بدون كرتونة</option>';
+  cartons.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o);});
+  if([...sel.options].some(o=>o.value===cur))sel.value=cur;
+}
+
+// ═══ DEVICES ═══
+function addDevice(type){
+  const s=document.getElementById(type+'-serial').value.trim();
+  const m=document.getElementById(type+'-model').value.trim();
+  if(!s){showAlert(type,'⚠️ اكتب السيريل النمبر','err');return}
+  if(DB[type].find(x=>x.serial===s)){showAlert(type,'⚠️ السيريل موجود بالفعل','err');return}
+  DB[type].push({serial:s,model:m||'-',date:td(),added:ts()});
+  save(type,DB[type]);
+  showAlert(type,'✅ تم الإضافة بنجاح');
+  document.getElementById(type+'-serial').value='';
+  document.getElementById(type+'-model').value='';
+  renderAll();
+}
+
+function bulkAdd(type){
+  const raw=document.getElementById(type+'-bulk').value.trim();
+  const model=document.getElementById(type+'-bulk-model').value.trim()||'-';
+  if(!raw){showAlert(type,'⚠️ الحقل فاضي','err');return}
+  const lines=raw.split('\n').map(l=>l.trim()).filter(Boolean);
+  const exist=new Set(DB[type].map(x=>x.serial));
+  let added=0,skipped=0;
+  lines.forEach(s=>{if(exist.has(s)){skipped++;return}DB[type].push({serial:s,model,date:td(),added:ts()});added++;});
+  save(type,DB[type]);
+  showAlert(type,`✅ تم إضافة ${added}${skipped?` — تجاهل ${skipped} مكررة`:''}`);
+  document.getElementById(type+'-bulk').value='';
+  renderAll();
+}
+
+function delItem(type,serial){
+  if(!confirm(`حذف ${serial} من المخزن؟`))return;
+  DB[type]=DB[type].filter(x=>x.serial!==serial);
+  saveLocal(type,DB[type]);
+  sbDelete(TABLE[type], serial);
+  renderAll();
+}
+
+// ═══ RENDER ═══
+function renderTbl(type){
+  const q=(document.getElementById(type+'-search')||{}).value?.toLowerCase()||'';
+  const cartonF=type==='sim'?(document.getElementById('sim-filter-carton')||{}).value||'':'';
+  let data=DB[type].filter(x=>x.serial.toLowerCase().includes(q)||(x.carton||'').toLowerCase().includes(q)||(x.model||'').toLowerCase().includes(q));
+  if(type==='sim'&&cartonF){
+    if(cartonF==='__nocarton__') data=data.filter(x=>x.carton==='بدون كرتونة'||!x.carton);
+    else data=data.filter(x=>x.carton===cartonF);
+  }
+  const tb=document.getElementById(type+'-tbl');
+  const badge=document.getElementById(type+'-badge');
+  if(badge)badge.textContent=DB[type].length;
+  if(!data.length){tb.innerHTML='<tr><td colspan="5" class="empty"><div class="ei">📭</div>لا يوجد بيانات</td></tr>';return}
+  tb.innerHTML=data.map((x,i)=>{
+    const cartonLabel=x.carton||x.model||'-';
+    const isNoCarton=type==='sim'&&x.carton==='بدون كرتونة';
+    const cartonStyle=isNoCarton?'color:var(--warn);font-weight:700':'';
+    return`<tr>
+      <td style="color:var(--muted);font-size:11px">${i+1}</td>
+      <td class="serial">${x.serial}</td>
+      <td style="${cartonStyle}">${cartonLabel}${isNoCarton?' 📱':''}</td>
+      <td style="color:var(--muted);font-size:11px">${x.date}</td>
+      <td><button class="btn btn-danger" onclick="delItem('${type}','${x.serial}')">🗑</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderSalesTbl(){
+  const q=document.getElementById('sales-search').value.toLowerCase();
+  const f=document.getElementById('sales-filter').value;
+  const data=DB.sales.filter(x=>(!f||x.type===f)&&(!q||x.serial.toLowerCase().includes(q)||(x.customer||'').toLowerCase().includes(q)));
+  document.getElementById('sales-badge').textContent=DB.sales.length;
+  const tb=document.getElementById('sales-tbl');
+  if(!data.length){tb.innerHTML='<tr><td colspan="8" class="empty"><div class="ei">📭</div>لا توجد مبيعات</td></tr>';return}
+  const bc={sim:'st-sim',vdsl:'st-vdsl',ont:'st-ont',air:'st-air',mifi:'st-mifi'};
+  tb.innerHTML=data.map((x,i)=>`<tr>
+    <td style="color:var(--muted);font-size:11px">${i+1}</td>
+    <td><span class="sale-type ${bc[x.type]}">${LABELS[x.type]}</span></td>
+    <td class="serial">${x.serial}</td>
+    <td>${x.customer||'-'}</td>
+    <td style="font-size:11px;color:var(--muted)">${x.model||x.carton||'-'}</td>
+    <td style="font-size:11px;color:var(--muted)">${x.notes||'-'}</td>
+    <td style="font-size:11px;color:var(--muted)">${x.date}</td>
+    <td><button class="btn btn-danger" onclick="undoSale('${x.id}')">↩</button></td>
+  </tr>`).join('');
+}
+
+function renderStats(){
+  const cards=[
+    {label:'شرايح',val:DB.sim.length,icon:'📱',c:'#3584e4'},
+    {label:'VDSL',val:DB.vdsl.length,icon:'🌐',c:'#e01b24'},
+    {label:'ONT',val:DB.ont.length,icon:'🔌',c:'#33d17a'},
+    {label:'We Air',val:DB.air.length,icon:'📡',c:'#e5a50a'},
+    {label:'MiFi',val:DB.mifi.length,icon:'📶',c:'#9141ac'},
+    {label:'المبيعات',val:DB.sales.length,icon:'💸',c:'#00c87a'},
+  ];
+  const html=cards.map(c=>`<div class="stat-card">
+    <div class="stat-top" style="background:${c.c}"></div>
+    <span class="stat-icon">${c.icon}</span>
+    <div class="stat-label">${c.label}</div>
+    <div class="stat-val" style="color:${c.c}">${c.val}</div>
+  </div>`).join('');
+  ['stats-inv','stats-sales','stats-rep'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=html;});
+}
+
+function renderAll(){renderStats();refreshCartonFilter();['sim','vdsl','ont','air','mifi'].forEach(t=>renderTbl(t));renderSalesTbl();}
+
+// ═══ SALES ═══
+function checkSerialLive(){
+  const type=document.getElementById('sale-type').value;
+  const serial=document.getElementById('sale-serial').value.trim();
+  const status=document.getElementById('sale-serial-status');
+  if(!serial){status.style.display='none';return}
+  status.style.display='block';
+  if(!type){status.style.color='var(--warn)';status.textContent='⚠️ اختر نوع المنتج أولاً';return}
+  const item=DB[type].find(x=>x.serial===serial);
+  if(item){
+    const extra=item.carton?(` — كرتونة: ${item.carton}`):(item.model&&item.model!=='-'?` — موديل: ${item.model}`:'');
+    status.style.color='var(--success)';
+    status.textContent=`✅ موجود في المخزن${extra}`;
+  } else {
+    status.style.color='var(--danger)';
+    status.textContent='❌ السيريل مش موجود في المخزن';
+  }
+}
+
+function addSale(){
+  const type=document.getElementById('sale-type').value;
+  const serial=document.getElementById('sale-serial').value.trim();
+  const customer=document.getElementById('sale-customer').value.trim();
+  const notes=document.getElementById('sale-notes').value.trim();
+  if(!type){showAlert('sale','⚠️ اختر نوع المنتج','err');return}
+  if(!serial){showAlert('sale','⚠️ اكتب السيريل النمبر','err');return}
+  const item=DB[type].find(x=>x.serial===serial);
+  if(!item){showAlert('sale','❌ السيريل مش موجود في المخزن','err');return}
+  DB.sales.push({id:Date.now()+'',type,serial,customer,notes,model:item.model||null,carton:item.carton||null,date:ts()});
+  DB[type]=DB[type].filter(x=>x.serial!==serial);
+  save(type,DB[type]);save('sales',DB.sales);
+  showAlert('sale',`✅ تم بيع ${LABELS[type]} — ${serial}`);
+  document.getElementById('sale-type').value='';
+  document.getElementById('sale-serial').value='';
+  document.getElementById('sale-serial-status').style.display='none';
+  ['sale-customer','sale-notes'].forEach(id=>document.getElementById(id).value='');
+  renderAll();
+}
+
+function undoSale(id){
+  const sale=DB.sales.find(x=>x.id===id);
+  if(!sale||!confirm(`إرجاع ${sale.serial} للمخزن؟`))return;
+  DB[sale.type].push({serial:sale.serial,model:sale.model||'-',carton:sale.carton,date:td(),added:ts()});
+  DB.sales=DB.sales.filter(x=>x.id!==id);
+  saveLocal(sale.type,DB[sale.type]);
+  saveLocal('sales',DB.sales);
+  sbDeleteById(TABLE['sales'], id);
+  // Re-add to inventory in Supabase
+  save(sale.type, DB[sale.type]);
+  renderAll();
+}
+
+// ═══════════════════════════════════════════════════
+// EXCEL EXPORT — FULLY STYLED
+// ═══════════════════════════════════════════════════
+function C(v,bold,bg,fg,align,sz,border){
+  const s={font:{name:'Arial',sz:sz||11,bold:!!bold,color:{rgb:fg||'FF111111'}}};
+  if(bg)s.fill={fgColor:{rgb:bg},patternType:'solid'};
+  s.alignment={horizontal:align||'right',vertical:'center'};
+  if(border!==false)s.border={top:{style:'thin',color:{rgb:'FFB0C4DE'}},bottom:{style:'thin',color:{rgb:'FFB0C4DE'}},left:{style:'thin',color:{rgb:'FFB0C4DE'}},right:{style:'thin',color:{rgb:'FFB0C4DE'}}};
+  return{v:v===null||v===undefined?'':v,t:typeof v==='number'?'n':'s',s};
+}
+
+function col(n){let r='';n++;while(n>0){r=String.fromCharCode(65+(n-1)%26)+r;n=Math.floor((n-1)/26)}return r}
+
+function logoRows(ws,ncols,title,sub,hbg,hfg){
+  ws['A1']=C(title,true,hbg,hfg,'center',16,false);
+  ws['A2']=C('Apassia Stock Room   |   '+sub,false,hbg,'FFCCDDFF','center',11,false);
+  ws['A3']=C(new Date().toLocaleDateString('ar-EG',{year:'numeric',month:'long',day:'numeric'}),false,hbg,'FF99BBDD','center',10,false);
+  ws['A4']=C('',false,hbg,hfg,'center',6,false);
+  if(!ws['!merges'])ws['!merges']=[];
+  [0,1,2,3].forEach(r=>ws['!merges'].push({s:{r,c:0},e:{r,c:ncols-1}}));
+}
+
+function headerRow(ws,headers,row,hbg,hfg){
+  headers.forEach((h,ci)=>{ws[col(ci)+row]=C(h,true,hbg,hfg,'center',11)});
+}
+
+const ROW_COLORS=['FFE8F2FF','FFFFFFFF'];
+
+function buildSim(){
+  const ws={};
+  const hbg='FF0D47A1',hfg='FFFFFFFF';
+  const headers=['#','السيريل نمبر','اسم الكرتونة','تاريخ الإضافة'];
+  logoRows(ws,headers.length,'📱 مخزن الشرايح',`الإجمالي: ${DB.sim.length} شريحة`,hbg,hfg);
+  headerRow(ws,headers,5,hbg,hfg);
+  DB.sim.forEach((r,i)=>{
+    const row=6+i,bg=ROW_COLORS[i%2];
+    ws['A'+row]=C(i+1,false,bg,'FF333333','center');
+    ws['B'+row]=C(r.serial,false,bg,'FF1565C0','center');
+    ws['C'+row]=C(r.carton||'-',false,bg,'FF333333');
+    ws['D'+row]=C(r.date||'-',false,bg,'FF666666','center');
+  });
+  const last=Math.max(5,5+DB.sim.length);
+  ws['!ref']='A1:D'+last;
+  ws['!cols']=[{wch:6},{wch:28},{wch:26},{wch:24}];
+  ws['!rows']=[{hpt:28},{hpt:18},{hpt:16},{hpt:10},{hpt:22},...Array(DB.sim.length).fill({hpt:18})];
+  return ws;
+}
+
+function buildDevice(type){
+  const info={
+    vdsl:{title:'🌐 راوترات VDSL',bg:'FFB71C1C',fg:'FFFFFFFF'},
+    ont: {title:'🔌 راوترات ONT', bg:'FF1B5E20',fg:'FFFFFFFF'},
+    air: {title:'📡 أجهزة We Air',bg:'FFE65100',fg:'FFFFFFFF'},
+    mifi:{title:'📶 أجهزة MiFi',  bg:'FF4A148C',fg:'FFFFFFFF'},
+  }[type];
+  const ws={};
+  const headers=['#','السيريل نمبر','الموديل','تاريخ الإضافة'];
+  logoRows(ws,headers.length,info.title,`الإجمالي: ${DB[type].length} جهاز`,info.bg,info.fg);
+  headerRow(ws,headers,5,info.bg,info.fg);
+  DB[type].forEach((r,i)=>{
+    const row=6+i,bg=ROW_COLORS[i%2];
+    ws['A'+row]=C(i+1,false,bg,'FF333333','center');
+    ws['B'+row]=C(r.serial,false,bg,'FF1565C0','center');
+    ws['C'+row]=C(r.model||'-',false,bg,'FF333333');
+    ws['D'+row]=C(r.date||'-',false,bg,'FF666666','center');
+  });
+  const last=Math.max(5,5+DB[type].length);
+  ws['!ref']='A1:D'+last;
+  ws['!cols']=[{wch:6},{wch:28},{wch:22},{wch:24}];
+  ws['!rows']=[{hpt:28},{hpt:18},{hpt:16},{hpt:10},{hpt:22},...Array(DB[type].length).fill({hpt:18})];
+  return ws;
+}
+
+const SALE_COLORS={sim:'FFE3F2FD',vdsl:'FFFFEBEE',ont:'FFE8F5E9',air:'FFFFF3E0',mifi:'FFF3E5F5'};
+
+function buildSales(){
+  const ws={};
+  const hbg='FF006064',hfg='FFFFFFFF';
+  const headers=['#','النوع','السيريل نمبر','اسم العميل','الموديل/الكرتونة','الملاحظات','تاريخ البيع'];
+  logoRows(ws,headers.length,'💸 سجل المبيعات',`إجمالي المبيعات: ${DB.sales.length}`,hbg,hfg);
+  headerRow(ws,headers,5,hbg,hfg);
+  const accents={sim:'FF0D47A1',vdsl:'FFB71C1C',ont:'FF1B5E20',air:'FFE65100',mifi:'FF4A148C'};
+  DB.sales.forEach((r,i)=>{
+    const row=6+i;
+    const bg=i%2===0?(SALE_COLORS[r.type]||ROW_COLORS[0]):ROW_COLORS[1];
+    const ac=accents[r.type]||'FF111111';
+    ws['A'+row]=C(i+1,false,bg,'FF333333','center');
+    ws['B'+row]=C(LABELS[r.type]||r.type,true,bg,ac,'center');
+    ws['C'+row]=C(r.serial,false,bg,'FF1565C0','center');
+    ws['D'+row]=C(r.customer||'-',false,bg,'FF333333');
+    ws['E'+row]=C(r.model||r.carton||'-',false,bg,'FF555555');
+    ws['F'+row]=C(r.notes||'-',false,bg,'FF555555');
+    ws['G'+row]=C(r.date||'-',false,bg,'FF666666','center');
+  });
+  const last=Math.max(5,5+DB.sales.length);
+  ws['!ref']='A1:G'+last;
+  ws['!cols']=[{wch:5},{wch:12},{wch:28},{wch:22},{wch:22},{wch:26},{wch:24}];
+  ws['!rows']=[{hpt:28},{hpt:18},{hpt:16},{hpt:10},{hpt:22},...Array(DB.sales.length).fill({hpt:18})];
+  return ws;
+}
+
+function dlXLSX(wb,fname){
+  const out=XLSX.write(wb,{bookType:'xlsx',type:'binary',cellStyles:true});
+  const buf=new ArrayBuffer(out.length);
+  const view=new Uint8Array(buf);
+  for(let i=0;i<out.length;i++)view[i]=out.charCodeAt(i)&0xFF;
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([buf],{type:'application/octet-stream'}));
+  a.download=fname;a.click();
+}
+
+function exportSection(type){
+  if(!DB[type].length){alert('لا يوجد بيانات للتصدير');return}
+  const wb=XLSX.utils.book_new();
+  const names={sim:'الشرايح',vdsl:'VDSL',ont:'ONT',air:'WeAir',mifi:'MiFi',sales:'المبيعات'};
+  const ws=type==='sim'?buildSim():type==='sales'?buildSales():buildDevice(type);
+  XLSX.utils.book_append_sheet(wb,ws,names[type]);
+  dlXLSX(wb,`Apassia_${names[type]}_${td().replace(/\//g,'-')}.xlsx`);
+}
+
+function exportInventoryAll(){
+  const wb=XLSX.utils.book_new();
+  const sheets=[
+    {k:'sim',n:'الشرايح',f:buildSim},
+    {k:'vdsl',n:'VDSL',f:()=>buildDevice('vdsl')},
+    {k:'ont',n:'ONT',f:()=>buildDevice('ont')},
+    {k:'air',n:'WeAir',f:()=>buildDevice('air')},
+    {k:'mifi',n:'MiFi',f:()=>buildDevice('mifi')},
+  ];
+  sheets.forEach(s=>{if(DB[s.k].length)XLSX.utils.book_append_sheet(wb,s.f(),s.n)});
+  if(!wb.SheetNames.length){alert('المخزن فاضي');return}
+  dlXLSX(wb,`Apassia_المخزن_الكامل_${td().replace(/\//g,'-')}.xlsx`);
+}
+
+function exportAll(){
+  const wb=XLSX.utils.book_new();
+  const sheets=[
+    {k:'sim',n:'الشرايح',f:buildSim},
+    {k:'vdsl',n:'VDSL',f:()=>buildDevice('vdsl')},
+    {k:'ont',n:'ONT',f:()=>buildDevice('ont')},
+    {k:'air',n:'WeAir',f:()=>buildDevice('air')},
+    {k:'mifi',n:'MiFi',f:()=>buildDevice('mifi')},
+    {k:'sales',n:'المبيعات',f:buildSales},
+  ];
+  sheets.forEach(s=>{if(DB[s.k].length)XLSX.utils.book_append_sheet(wb,s.f(),s.n)});
+  if(!wb.SheetNames.length){alert('لا يوجد بيانات');return}
+  dlXLSX(wb,`Apassia_الكامل_${td().replace(/\//g,'-')}.xlsx`);
+}
+
+initDB();
+</script>
+</body>
+</html>
