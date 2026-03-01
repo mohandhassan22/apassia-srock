@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Apassia Stock Room</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
 <style>
 :root{
   --bg:#080d18;--surface:#0f1724;--card:#141e2f;--border:#1a3352;
@@ -108,7 +108,7 @@ tr:hover td{background:rgba(0,89,200,.07)}
   </div>
   <nav class="nav">
     <button class="nav-btn active" onclick="showPage('inventory',this)">🏪 المخزن</button>
-    <button class="nav-btn" onclick="showPage('sales',this)">خروج💾</button>
+    <button class="nav-btn" onclick="showPage('sales',this)">💸 المبيعات</button>
     <button class="nav-btn" onclick="showPage('reports',this)">📊 التقارير</button>
   </nav>
   <div id="sync-status" style="font-size:12px;font-weight:700;color:var(--muted);min-width:160px;text-align:center;">⏳ جاري التحميل...</div>
@@ -310,7 +310,7 @@ tr:hover td{background:rgba(0,89,200,.07)}
   <div class="stats-grid" id="stats-sales"></div>
   <div class="grid2" style="margin-bottom:22px">
     <div class="card">
-      <div class="card-title">💾تسجيل الخروج من المخزن</div>
+      <div class="card-title">💸 تسجيل بيعة جديدة</div>
       <div id="sale-alert" class="alert"></div>
       <div class="fg">
         <label>نوع المنتج</label>
@@ -330,7 +330,7 @@ tr:hover td{background:rgba(0,89,200,.07)}
       </div>
       <div class="fg"><label>اسم العميل (اختياري)</label><input id="sale-customer" placeholder="اسم العميل..."></div>
       <div class="fg"><label>ملاحظات (اختياري)</label><input id="sale-notes" placeholder="ملاحظات..."></div>
-      <button class="btn btn-primary" onclick="addSale()" style="background:linear-gradient(135deg,#065f46,var(--success))">✅ تسجيل الخروج</button>
+      <button class="btn btn-primary" onclick="addSale()" style="background:linear-gradient(135deg,#065f46,var(--success))">✅ تسجيل البيعة ومسحها من المخزن</button>
     </div>
     <div class="card" style="display:flex;flex-direction:column;justify-content:center;align-items:center;gap:16px;padding:32px">
       <div style="font-size:56px">🛒</div>
@@ -838,252 +838,206 @@ function undoSale(id){
 }
 
 // ═══════════════════════════════════════════════════
-// EXCEL EXPORT — FULLY STYLED
+// EXCEL EXPORT — ExcelJS (ألوان حقيقية)
 // ═══════════════════════════════════════════════════
-function C(v,bold,bg,fg,align,sz,border){
-  const s={font:{name:'Arial',sz:sz||11,bold:!!bold,color:{rgb:fg||'FF111111'}}};
-  if(bg)s.fill={fgColor:{rgb:bg},patternType:'solid'};
-  s.alignment={horizontal:align||'right',vertical:'center'};
-  if(border!==false)s.border={top:{style:'thin',color:{rgb:'FFB0C4DE'}},bottom:{style:'thin',color:{rgb:'FFB0C4DE'}},left:{style:'thin',color:{rgb:'FFB0C4DE'}},right:{style:'thin',color:{rgb:'FFB0C4DE'}}};
-  return{v:v===null||v===undefined?'':v,t:typeof v==='number'?'n':'s',s};
+
+// تحويل hex AARRGGBB → {argb}
+const argb = hex => ({argb: hex});
+
+function cellStyle(ws, rowNum, colNum, {value='', bold=false, bg=null, fg='FF111111', hAlign='right', fontSize=11, border=true}={}){
+  const cell = ws.getCell(rowNum, colNum);
+  cell.value = value === null || value === undefined ? '' : value;
+  cell.font  = {name:'Arial', size:fontSize, bold, color: argb(fg)};
+  cell.alignment = {horizontal: hAlign, vertical:'middle', wrapText:false};
+  if(bg) cell.fill = {type:'pattern', pattern:'solid', fgColor: argb(bg)};
+  if(border){
+    const bs = {style:'thin', color: argb('FFB0C4DE')};
+    cell.border = {top:bs, bottom:bs, left:bs, right:bs};
+  }
+  return cell;
 }
 
-function col(n){let r='';n++;while(n>0){r=String.fromCharCode(65+(n-1)%26)+r;n=Math.floor((n-1)/26)}return r}
-
-function logoRows(ws,ncols,title,sub,hbg,hfg){
-  ws['A1']=C(title,true,hbg,hfg,'center',16,false);
-  ws['A2']=C('Apassia Stock Room   |   '+sub,false,hbg,'FFCCDDFF','center',11,false);
-  ws['A3']=C(new Date().toLocaleDateString('ar-EG',{year:'numeric',month:'long',day:'numeric'}),false,hbg,'FF99BBDD','center',10,false);
-  ws['A4']=C('',false,hbg,hfg,'center',6,false);
-  if(!ws['!merges'])ws['!merges']=[];
-  [0,1,2,3].forEach(r=>ws['!merges'].push({s:{r,c:0},e:{r,c:ncols-1}}));
+function mergeRow(ws, rowNum, c1, c2, opts){
+  cellStyle(ws, rowNum, c1, opts);
+  ws.mergeCells(rowNum, c1, rowNum, c2);
 }
 
-function headerRow(ws,headers,row,hbg,hfg){
-  headers.forEach((h,ci)=>{ws[col(ci)+row]=C(h,true,hbg,hfg,'center',11)});
+function logoBlock(ws, ncols, title, sub){
+  const HDR = 'FF1A237E';
+  mergeRow(ws,1,1,ncols,{value:title, bold:true, bg:HDR, fg:'FFFFFFFF', hAlign:'center', fontSize:16, border:false});
+  mergeRow(ws,2,1,ncols,{value:'Apassia Stock Room  |  '+sub, bg:HDR, fg:'FFBBDEFB', hAlign:'center', fontSize:11, border:false});
+  mergeRow(ws,3,1,ncols,{value:new Date().toLocaleDateString('ar-EG',{year:'numeric',month:'long',day:'numeric'}), bg:HDR, fg:'FF90CAF9', hAlign:'center', fontSize:10, border:false});
+  mergeRow(ws,4,1,ncols,{value:'', bg:HDR, fg:HDR, hAlign:'center', fontSize:5, border:false});
+  ws.getRow(1).height=30; ws.getRow(2).height=18; ws.getRow(3).height=15; ws.getRow(4).height=7;
 }
 
-const ROW_COLORS=['#FFE8F2FF','#FFFFFFFF'];
+// ─── بناء شيت الشرايح ───
+function buildSimSheet(wb){
+  const ws = wb.addWorksheet('الشرايح');
+  ws.views = [{rightToLeft:true}];
 
-function buildSim(){
-  const ws={};
-
-  // ── الألوان الأساسية ──
-  const HDR_BG   = '#FF5E35B1'; // موف غامق — header
-  const HDR_FG   = '#FFFFFFFF';
-  const SEC_CART = '#FF7E57C2'; // موف — سطر عنوان الكرتونة
-  const SEC_FG   = '#FFFFFFFF';
-  const ROW_PURP = '#FFF3E5F5'; // موف فاتح جداً
-  const ROW_WHT  = '#FFFFFFFF'; // أبيض
-  const ACCENT   = '#FF6A1B9A'; // موف نص
-  const MUTED    = '#FF9575CD';
-  const SEP_BG   = '#FFD1C4E9'; // فاصل بين sections
-
-  // ── فرز البيانات ──
-  const sortSerial=(a,b)=>{
-    try{const na=BigInt(a.serial.replace(/\D/g,'')||'0'),nb=BigInt(b.serial.replace(/\D/g,'')||'0');return na<nb?-1:na>nb?1:0;}catch{return 0;}
-  };
-
-  // الشرايح بكرتونة — مجموعة حسب اسم الكرتونة
+  const sortSerial=(a,b)=>{try{const na=BigInt(a.serial.replace(/\D/g,'')||'0'),nb=BigInt(b.serial.replace(/\D/g,'')||'0');return na<nb?-1:na>nb?1:0;}catch{return 0;}};
   const cartonMap=new Map();
-  const noCartonItems=[];
+  const noCarton=[];
   DB.sim.forEach(r=>{
     const k=r.carton&&r.carton!=='بدون كرتونة'?r.carton:null;
     if(k){if(!cartonMap.has(k))cartonMap.set(k,[]);cartonMap.get(k).push(r);}
-    else noCartonItems.push(r);
+    else noCarton.push(r);
   });
-  noCartonItems.sort(sortSerial);
+  noCarton.sort(sortSerial);
 
-  // حساب إجمالي الكرتونات
-  const cartonCount=cartonMap.size;
-  const totalSim=DB.sim.length;
-
-  // ── الهيدر العلوي ──
   const NCOLS=5;
-  ws['A1']=C('📱  مخزن الشرايح — Apassia Stock Room',true,HDR_BG,HDR_FG,'center',16,false);
-  ws['A2']=C(`إجمالي الشرايح: ${totalSim}   |   كرتونات: ${cartonCount}   |   بدون كرتونة: ${noCartonItems.length}`,false,HDR_BG,'FFCE93D8','center',11,false);
-  ws['A3']=C(new Date().toLocaleDateString('ar-EG',{year:'numeric',month:'long',day:'numeric'}),false,HDR_BG,'FFB39DDB','center',10,false);
-  ws['A4']=C('',false,HDR_BG,HDR_FG,'center',6,false);
-  if(!ws['!merges'])ws['!merges']=[];
-  [0,1,2,3].forEach(r=>ws['!merges'].push({s:{r,c:0},e:{r,c:NCOLS-1}}));
+  ws.columns=[{width:5},{width:34},{width:26},{width:26},{width:14}];
+  logoBlock(ws, NCOLS, 'مخزن الشرايح', `الإجمالي: ${DB.sim.length} شريحة  |  كرتونات: ${cartonMap.size}  |  بدون كرتونة: ${noCarton.length}`);
 
-  let rowIdx=5; // 0-based
+  let r=5;
 
-  // ════════════════════════════════
-  // قسم ١: الكرتونات
-  // ════════════════════════════════
+  // ══ قسم الكرتونات ══
   if(cartonMap.size>0){
-    // عنوان القسم
-    ws[col(0)+(rowIdx+1)]=C('📦  الشرايح بالكرتونة',true,SEC_CART,SEC_FG,'center',12,false);
-    ws['!merges'].push({s:{r:rowIdx,c:0},e:{r:rowIdx,c:NCOLS-1}});
-    rowIdx++;
+    mergeRow(ws,r,1,NCOLS,{value:'الشرايح بالكرتونة', bold:true, bg:'FF5E35B1', fg:'FFFFFFFF', hAlign:'center', fontSize:12, border:false});
+    ws.getRow(r).height=22; r++;
 
-    // هيدر الجدول
-    const cartHeaders=['#','اسم الكرتونة','أول سيريل','آخر سيريل','عدد الشرايح'];
-    cartHeaders.forEach((h,ci)=>ws[col(ci)+(rowIdx+1)]=C(h,true,'FFB39DDB',ACCENT,'center',10));
-    rowIdx++;
+    // هيدر
+    const ch=['#','اسم الكرتونة','أول سيريل','آخر سيريل','عدد الشرايح'];
+    ch.forEach((h,ci)=>cellStyle(ws,r,ci+1,{value:h,bold:true,bg:'FFD1C4E9',fg:'FF4527A0',hAlign:'center',fontSize:10}));
+    ws.getRow(r).height=20; r++;
 
-    // صفوف الكرتونات
-    let cartIdx=0;
-    cartonMap.forEach((items,cartonName)=>{
+    let ci=0;
+    cartonMap.forEach((items,name)=>{
       const sorted=[...items].sort(sortSerial);
-      const from=sorted[0].serial;
-      const to=sorted[sorted.length-1].serial;
-      const count=sorted.length;
-      const date=sorted[0].date||'-';
-      const bg=cartIdx%2===0?ROW_PURP:ROW_WHT;
-      const r=rowIdx+1;
-      ws['A'+r]=C(cartIdx+1,false,bg,MUTED,'center',10);
-      ws['B'+r]=C(cartonName,true,bg,ACCENT,'right',11);
-      ws['C'+r]=C(from,false,bg,'FF4527A0','center',10);
-      ws['D'+r]=C(to,false,bg,'FF4527A0','center',10);
-      ws['E'+r]=C(count,true,bg,'FF2E7D32','center',11);
-      rowIdx++;cartIdx++;
+      const bg = ci%2===0 ? 'FFF3E5F5' : 'FFFFFFFF';
+      cellStyle(ws,r,1,{value:ci+1, bg, fg:'FF9575CD', hAlign:'center', fontSize:10});
+      cellStyle(ws,r,2,{value:name, bold:true, bg, fg:'FF4527A0', hAlign:'right', fontSize:11});
+      cellStyle(ws,r,3,{value:sorted[0].serial, bg, fg:'FF311B92', hAlign:'center', fontSize:10});
+      cellStyle(ws,r,4,{value:sorted[sorted.length-1].serial, bg, fg:'FF311B92', hAlign:'center', fontSize:10});
+      cellStyle(ws,r,5,{value:sorted.length, bold:true, bg, fg:'FF1B5E20', hAlign:'center', fontSize:11});
+      ws.getRow(r).height=20; r++; ci++;
     });
 
     // فاصل
-    ws[col(0)+(rowIdx+1)]=C('',false,SEP_BG,SEP_BG,'center',4,false);
-    ws['!merges'].push({s:{r:rowIdx,c:0},e:{r:rowIdx,c:NCOLS-1}});
-    rowIdx++;
+    mergeRow(ws,r,1,NCOLS,{value:'', bg:'FFD1C4E9', fg:'FFD1C4E9', hAlign:'center', fontSize:4, border:false});
+    ws.getRow(r).height=6; r++;
   }
 
-  // ════════════════════════════════
-  // قسم ٢: بدون كرتونة (كل سيريل لوحده)
-  // ════════════════════════════════
-  if(noCartonItems.length>0){
-    // عنوان القسم
-    ws[col(0)+(rowIdx+1)]=C('📱  شرايح بدون كرتونة',true,'FF8D6E63','FFFFFFFF','center',12,false);
-    ws['!merges'].push({s:{r:rowIdx,c:0},e:{r:rowIdx,c:NCOLS-1}});
-    rowIdx++;
+  // ══ قسم بدون كرتونة ══
+  if(noCarton.length>0){
+    mergeRow(ws,r,1,NCOLS,{value:'شرايح بدون كرتونة', bold:true, bg:'FF6D4C41', fg:'FFFFFFFF', hAlign:'center', fontSize:12, border:false});
+    ws.getRow(r).height=22; r++;
 
-    // هيدر
-    const singleHeaders=['#','السيريل نمبر','','','تاريخ الإضافة'];
-    singleHeaders.forEach((h,ci)=>ws[col(ci)+(rowIdx+1)]=C(h,true,'FFD7CCC8','FF4E342E','center',10));
-    ws['!merges'].push({s:{r:rowIdx,c:1},e:{r:rowIdx,c:3}}); // merge serial columns
-    rowIdx++;
+    // هيدر — السيريل يمتد 3 أعمدة
+    cellStyle(ws,r,1,{value:'#',bold:true,bg:'FFD7CCC8',fg:'FF4E342E',hAlign:'center',fontSize:10});
+    cellStyle(ws,r,2,{value:'السيريل نمبر',bold:true,bg:'FFD7CCC8',fg:'FF4E342E',hAlign:'center',fontSize:10});
+    ws.mergeCells(r,2,r,4);
+    cellStyle(ws,r,5,{value:'تاريخ الإضافة',bold:true,bg:'FFD7CCC8',fg:'FF4E342E',hAlign:'center',fontSize:10});
+    ws.getRow(r).height=20; r++;
 
-    noCartonItems.forEach((item,i)=>{
-      const bg=i%2===0?ROW_WHT:ROW_PURP;
-      const r=rowIdx+1;
-      ws['A'+r]=C(i+1,false,bg,MUTED,'center',10);
-      ws['B'+r]=C(item.serial,false,bg,'FF1A237E','center',11);
-      ws['C'+r]=C('',false,bg,'','center',11);
-      ws['D'+r]=C('',false,bg,'','center',11);
-      ws['E'+r]=C(item.date||'-',false,bg,'FF9E9E9E','center',10);
-      // merge serial across B,C,D
-      ws['!merges'].push({s:{r:rowIdx,c:1},e:{r:rowIdx,c:3}});
-      rowIdx++;
+    noCarton.forEach((item,i)=>{
+      const bg = i%2===0 ? 'FFFFFFFF' : 'FFF3E5F5';
+      cellStyle(ws,r,1,{value:i+1, bg, fg:'FF9575CD', hAlign:'center', fontSize:10});
+      cellStyle(ws,r,2,{value:item.serial, bg, fg:'FF1A237E', hAlign:'center', fontSize:10});
+      ws.mergeCells(r,2,r,4);
+      cellStyle(ws,r,5,{value:item.date||'-', bg, fg:'FF9E9E9E', hAlign:'center', fontSize:10});
+      ws.getRow(r).height=19; r++;
     });
   }
-
-  ws['!ref']='A1:'+col(NCOLS-1)+(rowIdx+1);
-  ws['!cols']=[{wch:5},{wch:32},{wch:26},{wch:26},{wch:14}];
-  ws['!rows']=[
-    {hpt:30},{hpt:18},{hpt:14},{hpt:6},
-    ...Array(rowIdx).fill({hpt:20})
-  ];
-  return ws;
 }
 
-function buildDevice(type){
+// ─── بناء شيت الأجهزة ───
+function buildDeviceSheet(wb, type){
   const info={
-    vdsl:{title:'🌐 راوترات VDSL',bg:'FFB71C1C',fg:'FFFFFFFF'},
-    ont: {title:'🔌 راوترات ONT', bg:'FF1B5E20',fg:'FFFFFFFF'},
-    air: {title:'📡 أجهزة We Air',bg:'FFE65100',fg:'FFFFFFFF'},
-    mifi:{title:'📶 أجهزة MiFi',  bg:'FF4A148C',fg:'FFFFFFFF'},
+    vdsl:{title:'راوترات VDSL', hdr:'FFB71C1C', col1:'FFFFEBEE', col2:'FFFFFFFF'},
+    ont: {title:'راوترات ONT',  hdr:'FF1B5E20', col1:'FFE8F5E9', col2:'FFFFFFFF'},
+    air: {title:'أجهزة We Air', hdr:'FFE65100', col1:'FFFFF3E0', col2:'FFFFFFFF'},
+    mifi:{title:'أجهزة MiFi',   hdr:'FF4A148C', col1:'FFF3E5F5', col2:'FFFFFFFF'},
   }[type];
-  const ws={};
-  const headers=['#','السيريل نمبر','الموديل','تاريخ الإضافة'];
-  logoRows(ws,headers.length,info.title,`الإجمالي: ${DB[type].length} جهاز`,info.bg,info.fg);
-  headerRow(ws,headers,5,info.bg,info.fg);
-  DB[type].forEach((r,i)=>{
-    const row=6+i,bg=ROW_COLORS[i%2];
-    ws['A'+row]=C(i+1,false,bg,'FF333333','center');
-    ws['B'+row]=C(r.serial,false,bg,'FF1565C0','center');
-    ws['C'+row]=C(r.model||'-',false,bg,'FF333333');
-    ws['D'+row]=C(r.date||'-',false,bg,'FF666666','center');
+  const names={vdsl:'VDSL',ont:'ONT',air:'WeAir',mifi:'MiFi'};
+  const ws = wb.addWorksheet(names[type]);
+  ws.views=[{rightToLeft:true}];
+  ws.columns=[{width:5},{width:30},{width:22},{width:22}];
+  logoBlock(ws,4,info.title,`الإجمالي: ${DB[type].length} جهاز`);
+
+  const hdr=['#','السيريل نمبر','الموديل','تاريخ الإضافة'];
+  hdr.forEach((h,ci)=>cellStyle(ws,5,ci+1,{value:h,bold:true,bg:info.hdr,fg:'FFFFFFFF',hAlign:'center',fontSize:10}));
+  ws.getRow(5).height=20;
+
+  DB[type].forEach((item,i)=>{
+    const bg=i%2===0?info.col1:info.col2;
+    const r=6+i;
+    cellStyle(ws,r,1,{value:i+1,bg,fg:'FF666666',hAlign:'center',fontSize:10});
+    cellStyle(ws,r,2,{value:item.serial,bg,fg:'FF1565C0',hAlign:'center',fontSize:10});
+    cellStyle(ws,r,3,{value:item.model||'-',bg,fg:'FF333333',hAlign:'right',fontSize:10});
+    cellStyle(ws,r,4,{value:item.date||'-',bg,fg:'FF888888',hAlign:'center',fontSize:10});
+    ws.getRow(r).height=19;
   });
-  const last=Math.max(5,5+DB[type].length);
-  ws['!ref']='A1:D'+last;
-  ws['!cols']=[{wch:6},{wch:28},{wch:22},{wch:24}];
-  ws['!rows']=[{hpt:28},{hpt:18},{hpt:16},{hpt:10},{hpt:22},...Array(DB[type].length).fill({hpt:18})];
-  return ws;
 }
 
-const SALE_COLORS={sim:'FFE3F2FD',vdsl:'FFFFEBEE',ont:'FFE8F5E9',air:'FFFFF3E0',mifi:'FFF3E5F5'};
+// ─── بناء شيت المبيعات ───
+function buildSalesSheet(wb){
+  const ws = wb.addWorksheet('المبيعات');
+  ws.views=[{rightToLeft:true}];
+  ws.columns=[{width:5},{width:12},{width:28},{width:22},{width:22},{width:26},{width:22}];
+  logoBlock(ws,7,'سجل المبيعات',`إجمالي المبيعات: ${DB.sales.length}`);
 
-function buildSales(){
-  const ws={};
-  const hbg='FF006064',hfg='FFFFFFFF';
-  const headers=['#','النوع','السيريل نمبر','اسم العميل','الموديل/الكرتونة','الملاحظات','تاريخ البيع'];
-  logoRows(ws,headers.length,'💸 سجل المبيعات',`إجمالي المبيعات: ${DB.sales.length}`,hbg,hfg);
-  headerRow(ws,headers,5,hbg,hfg);
-  const accents={sim:'FF0D47A1',vdsl:'FFB71C1C',ont:'FF1B5E20',air:'FFE65100',mifi:'FF4A148C'};
-  DB.sales.forEach((r,i)=>{
-    const row=6+i;
-    const bg=i%2===0?(SALE_COLORS[r.type]||ROW_COLORS[0]):ROW_COLORS[1];
-    const ac=accents[r.type]||'FF111111';
-    ws['A'+row]=C(i+1,false,bg,'FF333333','center');
-    ws['B'+row]=C(LABELS[r.type]||r.type,true,bg,ac,'center');
-    ws['C'+row]=C(r.serial,false,bg,'FF1565C0','center');
-    ws['D'+row]=C(r.customer||'-',false,bg,'FF333333');
-    ws['E'+row]=C(r.model||r.carton||'-',false,bg,'FF555555');
-    ws['F'+row]=C(r.notes||'-',false,bg,'FF555555');
-    ws['G'+row]=C(r.date||'-',false,bg,'FF666666','center');
+  const hdr=['#','النوع','السيريل نمبر','اسم العميل','الموديل/الكرتونة','الملاحظات','تاريخ البيع'];
+  hdr.forEach((h,ci)=>cellStyle(ws,5,ci+1,{value:h,bold:true,bg:'FF006064',fg:'FFFFFFFF',hAlign:'center',fontSize:10}));
+  ws.getRow(5).height=20;
+
+  const bgMap={sim:['FFE3F2FD','FFFFFFFF'],vdsl:['FFFFEBEE','FFFFFFFF'],ont:['FFE8F5E9','FFFFFFFF'],air:['FFFFF3E0','FFFFFFFF'],mifi:['FFF3E5F5','FFFFFFFF']};
+  const fgMap={sim:'FF0D47A1',vdsl:'FFB71C1C',ont:'FF1B5E20',air:'FFE65100',mifi:'FF4A148C'};
+
+  DB.sales.forEach((item,i)=>{
+    const bg=(bgMap[item.type]||['FFE8F2FF','FFFFFFFF'])[i%2];
+    const ac=fgMap[item.type]||'FF111111';
+    const r=6+i;
+    cellStyle(ws,r,1,{value:i+1,bg,fg:'FF666666',hAlign:'center',fontSize:10});
+    cellStyle(ws,r,2,{value:LABELS[item.type]||item.type,bold:true,bg,fg:ac,hAlign:'center',fontSize:10});
+    cellStyle(ws,r,3,{value:item.serial,bg,fg:'FF1565C0',hAlign:'center',fontSize:10});
+    cellStyle(ws,r,4,{value:item.customer||'-',bg,fg:'FF333333',hAlign:'right',fontSize:10});
+    cellStyle(ws,r,5,{value:item.model||item.carton||'-',bg,fg:'FF555555',hAlign:'right',fontSize:10});
+    cellStyle(ws,r,6,{value:item.notes||'-',bg,fg:'FF666666',hAlign:'right',fontSize:10});
+    cellStyle(ws,r,7,{value:item.date||'-',bg,fg:'FF888888',hAlign:'center',fontSize:10});
+    ws.getRow(r).height=19;
   });
-  const last=Math.max(5,5+DB.sales.length);
-  ws['!ref']='A1:G'+last;
-  ws['!cols']=[{wch:5},{wch:12},{wch:28},{wch:22},{wch:22},{wch:26},{wch:24}];
-  ws['!rows']=[{hpt:28},{hpt:18},{hpt:16},{hpt:10},{hpt:22},...Array(DB.sales.length).fill({hpt:18})];
-  return ws;
 }
 
-function dlXLSX(wb,fname){
-  const out=XLSX.write(wb,{bookType:'xlsx',type:'binary',cellStyles:true});
-  const buf=new ArrayBuffer(out.length);
-  const view=new Uint8Array(buf);
-  for(let i=0;i<out.length;i++)view[i]=out.charCodeAt(i)&0xFF;
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([buf],{type:'application/octet-stream'}));
-  a.download=fname;a.click();
+// ─── تنزيل الملف ───
+async function dlXLSX(wb, fname){
+  const buf = await wb.xlsx.writeBuffer();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+  a.download = fname; a.click();
 }
 
-function exportSection(type){
+async function exportSection(type){
   if(!DB[type].length){alert('لا يوجد بيانات للتصدير');return}
-  const wb=XLSX.utils.book_new();
+  const wb = new ExcelJS.Workbook();
+  wb.creator='Apassia'; wb.created=new Date();
+  if(type==='sim') buildSimSheet(wb);
+  else if(type==='sales') buildSalesSheet(wb);
+  else buildDeviceSheet(wb,type);
   const names={sim:'الشرايح',vdsl:'VDSL',ont:'ONT',air:'WeAir',mifi:'MiFi',sales:'المبيعات'};
-  const ws=type==='sim'?buildSim():type==='sales'?buildSales():buildDevice(type);
-  XLSX.utils.book_append_sheet(wb,ws,names[type]);
-  dlXLSX(wb,`Apassia_${names[type]}_${td().replace(/\//g,'-')}.xlsx`);
+  await dlXLSX(wb,`Apassia_${names[type]}_${td().replace(/\//g,'-')}.xlsx`);
 }
 
-function exportInventoryAll(){
-  const wb=XLSX.utils.book_new();
-  const sheets=[
-    {k:'sim',n:'الشرايح',f:buildSim},
-    {k:'vdsl',n:'VDSL',f:()=>buildDevice('vdsl')},
-    {k:'ont',n:'ONT',f:()=>buildDevice('ont')},
-    {k:'air',n:'WeAir',f:()=>buildDevice('air')},
-    {k:'mifi',n:'MiFi',f:()=>buildDevice('mifi')},
-  ];
-  sheets.forEach(s=>{if(DB[s.k].length)XLSX.utils.book_append_sheet(wb,s.f(),s.n)});
-  if(!wb.SheetNames.length){alert('المخزن فاضي');return}
-  dlXLSX(wb,`Apassia_المخزن_الكامل_${td().replace(/\//g,'-')}.xlsx`);
+async function exportInventoryAll(){
+  const wb = new ExcelJS.Workbook();
+  wb.creator='Apassia'; wb.created=new Date();
+  let any=false;
+  if(DB.sim.length){buildSimSheet(wb);any=true;}
+  ['vdsl','ont','air','mifi'].forEach(t=>{if(DB[t].length){buildDeviceSheet(wb,t);any=true;}});
+  if(!any){alert('المخزن فاضي');return}
+  await dlXLSX(wb,`Apassia_المخزن_الكامل_${td().replace(/\//g,'-')}.xlsx`);
 }
 
-function exportAll(){
-  const wb=XLSX.utils.book_new();
-  const sheets=[
-    {k:'sim',n:'الشرايح',f:buildSim},
-    {k:'vdsl',n:'VDSL',f:()=>buildDevice('vdsl')},
-    {k:'ont',n:'ONT',f:()=>buildDevice('ont')},
-    {k:'air',n:'WeAir',f:()=>buildDevice('air')},
-    {k:'mifi',n:'MiFi',f:()=>buildDevice('mifi')},
-    {k:'sales',n:'المبيعات',f:buildSales},
-  ];
-  sheets.forEach(s=>{if(DB[s.k].length)XLSX.utils.book_append_sheet(wb,s.f(),s.n)});
-  if(!wb.SheetNames.length){alert('لا يوجد بيانات');return}
-  dlXLSX(wb,`Apassia_الكامل_${td().replace(/\//g,'-')}.xlsx`);
+async function exportAll(){
+  const wb = new ExcelJS.Workbook();
+  wb.creator='Apassia'; wb.created=new Date();
+  let any=false;
+  if(DB.sim.length){buildSimSheet(wb);any=true;}
+  ['vdsl','ont','air','mifi'].forEach(t=>{if(DB[t].length){buildDeviceSheet(wb,t);any=true;}});
+  if(DB.sales.length){buildSalesSheet(wb);any=true;}
+  if(!any){alert('لا يوجد بيانات');return}
+  await dlXLSX(wb,`Apassia_الكامل_${td().replace(/\//g,'-')}.xlsx`);
 }
 
 initDB();
