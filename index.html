@@ -812,7 +812,10 @@ function addSale(){
   if(!item){showAlert('sale','❌ السيريل مش موجود في المخزن','err');return}
   DB.sales.push({id:Date.now()+'',type,serial,customer,notes,model:item.model||null,carton:item.carton||null,date:ts()});
   DB[type]=DB[type].filter(x=>x.serial!==serial);
-  save(type,DB[type]);save('sales',DB.sales);
+  saveLocal(type,DB[type]);
+  saveLocal('sales',DB.sales);
+  sbDelete(TABLE[type], serial);
+  save('sales', DB.sales);
   showAlert('sale',`✅ تم بيع ${LABELS[type]} — ${serial}`);
   document.getElementById('sale-type').value='';
   document.getElementById('sale-serial').value='';
