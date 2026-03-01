@@ -864,40 +864,121 @@ const ROW_COLORS=['FFE8F2FF','FFFFFFFF'];
 
 function buildSim(){
   const ws={};
-  const hbg='FF0D47A1',hfg='FFFFFFFF';
-  const headers=['#','اسم الكرتونة','من (أول سيريل)','لـ (آخر سيريل)','عدد الشرايح','تاريخ الإضافة'];
 
-  // Group by carton
+  // ── الألوان الأساسية ──
+  const HDR_BG   = 'FF5E35B1'; // موف غامق — header
+  const HDR_FG   = 'FFFFFFFF';
+  const SEC_CART = 'FF7E57C2'; // موف — سطر عنوان الكرتونة
+  const SEC_FG   = 'FFFFFFFF';
+  const ROW_PURP = 'FFF3E5F5'; // موف فاتح جداً
+  const ROW_WHT  = 'FFFFFFFF'; // أبيض
+  const ACCENT   = 'FF6A1B9A'; // موف نص
+  const MUTED    = 'FF9575CD';
+  const SEP_BG   = 'FFD1C4E9'; // فاصل بين sections
+
+  // ── فرز البيانات ──
+  const sortSerial=(a,b)=>{
+    try{const na=BigInt(a.serial.replace(/\D/g,'')||'0'),nb=BigInt(b.serial.replace(/\D/g,'')||'0');return na<nb?-1:na>nb?1:0;}catch{return 0;}
+  };
+
+  // الشرايح بكرتونة — مجموعة حسب اسم الكرتونة
   const cartonMap=new Map();
+  const noCartonItems=[];
   DB.sim.forEach(r=>{
-    const key=r.carton||'بدون كرتونة';
-    if(!cartonMap.has(key))cartonMap.set(key,[]);
-    cartonMap.get(key).push(r);
+    const k=r.carton&&r.carton!=='بدون كرتونة'?r.carton:null;
+    if(k){if(!cartonMap.has(k))cartonMap.set(k,[]);cartonMap.get(k).push(r);}
+    else noCartonItems.push(r);
   });
-  const groups=[];
-  cartonMap.forEach((items,cartonName)=>{
-    const sorted=[...items].sort((a,b)=>{
-      try{const na=BigInt(a.serial.replace(/\D/g,'')||'0'),nb=BigInt(b.serial.replace(/\D/g,'')||'0');return na<nb?-1:na>nb?1:0;}catch{return 0;}
-    });
-    groups.push({carton:cartonName,from:sorted[0].serial,to:sorted[sorted.length-1].serial,count:sorted.length,date:sorted[0].date||'-',single:sorted.length===1});
-  });
+  noCartonItems.sort(sortSerial);
 
-  logoRows(ws,headers.length,'📱 مخزن الشرايح',`الإجمالي: ${DB.sim.length} شريحة — ${groups.length} كرتونة`,hbg,hfg);
-  headerRow(ws,headers,5,hbg,hfg);
-  groups.forEach((g,i)=>{
-    const row=6+i,bg=ROW_COLORS[i%2];
-    const noCarton=g.carton==='بدون كرتونة';
-    ws['A'+row]=C(i+1,false,bg,'FF333333','center');
-    ws['B'+row]=C(g.carton,true,bg,noCarton?'FFB45309':'FF0D47A1');
-    ws['C'+row]=C(g.from,false,bg,'FF1565C0','center');
-    ws['D'+row]=C(g.single?'-':g.to,false,bg,'FF1565C0','center');
-    ws['E'+row]=C(g.count,true,bg,'FF1B5E20','center');
-    ws['F'+row]=C(g.date,false,bg,'FF666666','center');
-  });
-  const lastRow=Math.max(5,5+groups.length);
-  ws['!ref']='A1:F'+lastRow;
-  ws['!cols']=[{wch:5},{wch:30},{wch:28},{wch:28},{wch:12},{wch:22}];
-  ws['!rows']=[{hpt:28},{hpt:18},{hpt:16},{hpt:10},{hpt:22},...Array(groups.length).fill({hpt:20})];
+  // حساب إجمالي الكرتونات
+  const cartonCount=cartonMap.size;
+  const totalSim=DB.sim.length;
+
+  // ── الهيدر العلوي ──
+  const NCOLS=5;
+  ws['A1']=C('📱  مخزن الشرايح — Apassia Stock Room',true,HDR_BG,HDR_FG,'center',16,false);
+  ws['A2']=C(`إجمالي الشرايح: ${totalSim}   |   كرتونات: ${cartonCount}   |   بدون كرتونة: ${noCartonItems.length}`,false,HDR_BG,'FFCE93D8','center',11,false);
+  ws['A3']=C(new Date().toLocaleDateString('ar-EG',{year:'numeric',month:'long',day:'numeric'}),false,HDR_BG,'FFB39DDB','center',10,false);
+  ws['A4']=C('',false,HDR_BG,HDR_FG,'center',6,false);
+  if(!ws['!merges'])ws['!merges']=[];
+  [0,1,2,3].forEach(r=>ws['!merges'].push({s:{r,c:0},e:{r,c:NCOLS-1}}));
+
+  let rowIdx=5; // 0-based
+
+  // ════════════════════════════════
+  // قسم ١: الكرتونات
+  // ════════════════════════════════
+  if(cartonMap.size>0){
+    // عنوان القسم
+    ws[col(0)+(rowIdx+1)]=C('📦  الشرايح بالكرتونة',true,SEC_CART,SEC_FG,'center',12,false);
+    ws['!merges'].push({s:{r:rowIdx,c:0},e:{r:rowIdx,c:NCOLS-1}});
+    rowIdx++;
+
+    // هيدر الجدول
+    const cartHeaders=['#','اسم الكرتونة','أول سيريل','آخر سيريل','عدد الشرايح'];
+    cartHeaders.forEach((h,ci)=>ws[col(ci)+(rowIdx+1)]=C(h,true,'FFB39DDB',ACCENT,'center',10));
+    rowIdx++;
+
+    // صفوف الكرتونات
+    let cartIdx=0;
+    cartonMap.forEach((items,cartonName)=>{
+      const sorted=[...items].sort(sortSerial);
+      const from=sorted[0].serial;
+      const to=sorted[sorted.length-1].serial;
+      const count=sorted.length;
+      const date=sorted[0].date||'-';
+      const bg=cartIdx%2===0?ROW_PURP:ROW_WHT;
+      const r=rowIdx+1;
+      ws['A'+r]=C(cartIdx+1,false,bg,MUTED,'center',10);
+      ws['B'+r]=C(cartonName,true,bg,ACCENT,'right',11);
+      ws['C'+r]=C(from,false,bg,'FF4527A0','center',10);
+      ws['D'+r]=C(to,false,bg,'FF4527A0','center',10);
+      ws['E'+r]=C(count,true,bg,'FF2E7D32','center',11);
+      rowIdx++;cartIdx++;
+    });
+
+    // فاصل
+    ws[col(0)+(rowIdx+1)]=C('',false,SEP_BG,SEP_BG,'center',4,false);
+    ws['!merges'].push({s:{r:rowIdx,c:0},e:{r:rowIdx,c:NCOLS-1}});
+    rowIdx++;
+  }
+
+  // ════════════════════════════════
+  // قسم ٢: بدون كرتونة (كل سيريل لوحده)
+  // ════════════════════════════════
+  if(noCartonItems.length>0){
+    // عنوان القسم
+    ws[col(0)+(rowIdx+1)]=C('📱  شرايح بدون كرتونة',true,'FF8D6E63','FFFFFFFF','center',12,false);
+    ws['!merges'].push({s:{r:rowIdx,c:0},e:{r:rowIdx,c:NCOLS-1}});
+    rowIdx++;
+
+    // هيدر
+    const singleHeaders=['#','السيريل نمبر','','','تاريخ الإضافة'];
+    singleHeaders.forEach((h,ci)=>ws[col(ci)+(rowIdx+1)]=C(h,true,'FFD7CCC8','FF4E342E','center',10));
+    ws['!merges'].push({s:{r:rowIdx,c:1},e:{r:rowIdx,c:3}}); // merge serial columns
+    rowIdx++;
+
+    noCartonItems.forEach((item,i)=>{
+      const bg=i%2===0?ROW_WHT:ROW_PURP;
+      const r=rowIdx+1;
+      ws['A'+r]=C(i+1,false,bg,MUTED,'center',10);
+      ws['B'+r]=C(item.serial,false,bg,'FF1A237E','center',11);
+      ws['C'+r]=C('',false,bg,'','center',11);
+      ws['D'+r]=C('',false,bg,'','center',11);
+      ws['E'+r]=C(item.date||'-',false,bg,'FF9E9E9E','center',10);
+      // merge serial across B,C,D
+      ws['!merges'].push({s:{r:rowIdx,c:1},e:{r:rowIdx,c:3}});
+      rowIdx++;
+    });
+  }
+
+  ws['!ref']='A1:'+col(NCOLS-1)+(rowIdx+1);
+  ws['!cols']=[{wch:5},{wch:32},{wch:26},{wch:26},{wch:14}];
+  ws['!rows']=[
+    {hpt:30},{hpt:18},{hpt:14},{hpt:6},
+    ...Array(rowIdx).fill({hpt:20})
+  ];
   return ws;
 }
 
