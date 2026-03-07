@@ -914,24 +914,61 @@ async function buildSimSheet(wb){
   await logoBlock(wb, ws, NCOLS, 'مخزن الشرايح', `الإجمالي: ${DB.sim.length} شريحة  |  كرتونات: ${cartonMap.size}  |  بدون كرتونة: ${noCarton.length}`);
   let r=5;
   if(cartonMap.size>0){
-    mergeRow(ws,r,1,NCOLS,{value:'الشرايح بالكرتونة', bold:true, bg:'FF5E35B1', fg:'FFFFFFFF', hAlign:'center', fontSize:12, border:false});
-    ws.getRow(r).height=22; r++;
-    const ch=['#','اسم الكرتونة','أول سيريل','آخر سيريل','عدد الشرايح'];
-    ch.forEach((h,ci)=>cellStyle(ws,r,ci+1,{value:h,bold:true,bg:'FFD1C4E9',fg:'FF4527A0',hAlign:'center',fontSize:10}));
-    ws.getRow(r).height=20; r++;
-    let ci=0;
+    // Separate closed vs open cartons
+    const closedCartons=[], openCartons=[];
     cartonMap.forEach((items,name)=>{
-      const sorted=[...items].sort(sortSerial);
-      const bg = ci%2===0 ? 'FFF3E5F5' : 'FFFFFFFF';
-      cellStyle(ws,r,1,{value:ci+1, bg, fg:'FF9575CD', hAlign:'center', fontSize:10});
-      cellStyle(ws,r,2,{value:name, bold:true, bg, fg:'FF4527A0', hAlign:'right', fontSize:11});
-      cellStyle(ws,r,3,{value:sorted[0].serial, bg, fg:'FF311B92', hAlign:'center', fontSize:10});
-      cellStyle(ws,r,4,{value:sorted[sorted.length-1].serial, bg, fg:'FF311B92', hAlign:'center', fontSize:10});
-      cellStyle(ws,r,5,{value:sorted.length, bold:true, bg, fg:'FF1B5E20', hAlign:'center', fontSize:11});
-      ws.getRow(r).height=20; r++; ci++;
+      const status=(window.CARTONS&&window.CARTONS[name])?window.CARTONS[name].status:'مغلقة';
+      if(status==='مفتوحة') openCartons.push({name,items});
+      else closedCartons.push({name,items});
     });
-    mergeRow(ws,r,1,NCOLS,{value:'', bg:'FFD1C4E9', fg:'FFD1C4E9', hAlign:'center', fontSize:4, border:false});
-    ws.getRow(r).height=6; r++;
+
+    // ── مغلقة: صف واحد لكل كرتونة ──
+    if(closedCartons.length>0){
+      mergeRow(ws,r,1,NCOLS,{value:'الكرتونات المغلقة', bold:true, bg:'FF5E35B1', fg:'FFFFFFFF', hAlign:'center', fontSize:12, border:false});
+      ws.getRow(r).height=22; r++;
+      const ch=['#','اسم الكرتونة','أول سيريل','آخر سيريل','عدد الشرايح'];
+      ch.forEach((h,ci)=>cellStyle(ws,r,ci+1,{value:h,bold:true,bg:'FFD1C4E9',fg:'FF4527A0',hAlign:'center',fontSize:10}));
+      ws.getRow(r).height=20; r++;
+      closedCartons.forEach(({name,items},ci)=>{
+        const sorted=[...items].sort(sortSerial);
+        const bg=ci%2===0?'FFF3E5F5':'FFFFFFFF';
+        cellStyle(ws,r,1,{value:ci+1,bg,fg:'FF9575CD',hAlign:'center',fontSize:10});
+        cellStyle(ws,r,2,{value:name,bold:true,bg,fg:'FF4527A0',hAlign:'right',fontSize:11});
+        cellStyle(ws,r,3,{value:sorted[0].serial,bg,fg:'FF311B92',hAlign:'center',fontSize:10});
+        cellStyle(ws,r,4,{value:sorted[sorted.length-1].serial,bg,fg:'FF311B92',hAlign:'center',fontSize:10});
+        cellStyle(ws,r,5,{value:sorted.length,bold:true,bg,fg:'FF1B5E20',hAlign:'center',fontSize:11});
+        ws.getRow(r).height=20; r++;
+      });
+      mergeRow(ws,r,1,NCOLS,{value:'',bg:'FFD1C4E9',fg:'FFD1C4E9',hAlign:'center',fontSize:4,border:false});
+      ws.getRow(r).height=6; r++;
+    }
+
+    // ── مفتوحة: صف لكل شريحة ──
+    if(openCartons.length>0){
+      mergeRow(ws,r,1,NCOLS,{value:'الكرتونات المفتوحة — شرايح منفردة', bold:true, bg:'FF827717', fg:'FFFFFFFF', hAlign:'center', fontSize:12, border:false});
+      ws.getRow(r).height=22; r++;
+      openCartons.forEach(({name,items})=>{
+        // Header row for this carton
+        mergeRow(ws,r,1,NCOLS,{value:`📦 ${name}  (${items.length} شريحة)`, bold:true, bg:'FFFFF9C4', fg:'FF5D4037', hAlign:'right', fontSize:11, border:false});
+        ws.getRow(r).height=20; r++;
+        const ch2=['#','السيريل نمبر','اسم الكرتونة','','تاريخ الإضافة'];
+        ch2.forEach((h,ci)=>{if(h)cellStyle(ws,r,ci+1,{value:h,bold:true,bg:'FFFFE082',fg:'FF4E342E',hAlign:'center',fontSize:10});});
+        ws.mergeCells(r,3,r,4);
+        ws.getRow(r).height=18; r++;
+        const sorted=[...items].sort(sortSerial);
+        sorted.forEach((item,i)=>{
+          const bg=i%2===0?'FFFFFFFF':'FFFFFDE7';
+          cellStyle(ws,r,1,{value:i+1,bg,fg:'FF9E9E9E',hAlign:'center',fontSize:10});
+          cellStyle(ws,r,2,{value:item.serial,bg,fg:'FF1A237E',hAlign:'center',fontSize:11});
+          cellStyle(ws,r,3,{value:name,bg,fg:'FF827717',hAlign:'right',fontSize:10});
+          ws.mergeCells(r,3,r,4);
+          cellStyle(ws,r,5,{value:item.date||'-',bg,fg:'FF9E9E9E',hAlign:'center',fontSize:10});
+          ws.getRow(r).height=19; r++;
+        });
+        mergeRow(ws,r,1,NCOLS,{value:'',bg:'FFFFE082',fg:'FFFFE082',hAlign:'center',fontSize:3,border:false});
+        ws.getRow(r).height=5; r++;
+      });
+    }
   }
   if(noCarton.length>0){
     mergeRow(ws,r,1,NCOLS,{value:'شرايح بدون كرتونة', bold:true, bg:'FF6D4C41', fg:'FFFFFFFF', hAlign:'center', fontSize:12, border:false});
