@@ -1051,24 +1051,25 @@
     }
 
     async function openCartonIfNeeded(cartonName) {
-      if (!window.CARTONS[cartonName]) return;
-      if (window.CARTONS[cartonName].status === 'مغلقة') {
-        window.CARTONS[cartonName].status = 'مفتوحة';
+      const meta = window.CARTONS[cartonName] || { status: 'مغلقة', ranges: [] };
+      if (meta.status === 'مغلقة') {
+        meta.status = 'مفتوحة';
+        window.CARTONS[cartonName] = meta;
         saveCartons();
         DB.sim.forEach(sim => {
           if (sim.carton === cartonName) sim.carton = 'بدون كرتونة';
         });
-        const ranges = window.CARTONS[cartonName].ranges || [];
-        ranges.forEach(r => {
-          const serials = genSerials(r.from, r.to);
-          serials.forEach(s => {
-            if (!DB.sim.find(x => x.serial === s)) {
-              DB.sim.push({ serial: s, carton: 'بدون كرتونة', date: td(), added: ts() });
-            }
+        if (meta.ranges && meta.ranges.length > 0) {
+          meta.ranges.forEach(r => {
+            const serials = genSerials(r.from, r.to);
+            serials.forEach(s => {
+              if (!DB.sim.find(x => x.serial === s)) {
+                DB.sim.push({ serial: s, carton: 'بدون كرتونة', date: td(), added: ts() });
+              }
+            });
           });
-        });
-        saveLocal('sim', DB.sim);
-        save('sim', DB.sim);
+        }
+        await save('sim', DB.sim);
         renderAll();
       }
     }
@@ -1147,22 +1148,45 @@
 
     function addRangeRow(fromVal = '', toVal = '') {
       rangeCount++;
-      const id = rangeCount;
-      const container = document.getElementById('ranges-container');
       const div = document.createElement('div');
-      div.id = 'range-row-' + id;
-      div.style.cssText = 'margin-bottom:10px;';
+      div.className = 'rrow';
+      div.id = `range-row-${rangeCount}`;
       div.innerHTML = `
-    <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
-      <span style="font-size:11px;color:var(--muted);font-weight:700;min-width:60px">نطاق ${id}</span>
-      ${id > 1 ? `<button class="btn btn-danger" style="margin-right:auto" onclick="removeRange(${id})">🗑</button>` : ''}
-    </div>
-    <div class="row2">
-      <div class="fg" style="margin-bottom:0"><label>أول سيريل</label><input id="sim-from-${id}" placeholder="8920040000000001" value="${fromVal}" oninput="previewAllRanges()"></div>
-      <div class="fg" style="margin-bottom:0"><label>آخر سيريل</label><input id="sim-to-${id}" placeholder="8920040000000100" value="${toVal}" oninput="previewAllRanges()"></div>
-    </div>`;
-      container.appendChild(div);
-      previewAllRanges();
+        <input id="from-${rangeCount}" placeholder="من سيريل" value="${fromVal}">
+        <div style="color:var(--muted)">←</div>
+        <input id="to-${rangeCount}" placeholder="إلى سيريل" value="${toVal}">
+        <button class="btn btn-danger btn-sm" style="width:auto;padding:4px 8px" onclick="this.parentElement.remove()">✕</button>
+      `;
+      document.getElementById('ranges-container').appendChild(div);
+    }
+
+    async function addSingleSim() {
+      const s = document.getElementById('sim-single-serial').value.trim();
+      if (!s) { showAlert('sim-single', '⚠️ اكتب السيريل', 'err'); return; }
+      if (DB.sim.find(x => x.serial === s)) { showAlert('sim-single', '❌ السيريل موجود مسبقاً', 'err'); return; }
+      DB.sim.push({ serial: s, carton: 'بدون كرتونة', date: td(), added: ts() });
+      await save('sim', DB.sim);
+      showAlert('sim-single', `✅ تم إضافة الشريحة ${s}`);
+      document.getElementById('sim-single-serial').value = '';
+      renderAll();
+    }
+
+    async function bulkAddSim() {
+      const raw = document.getElementById('sim-bulk').value.trim();
+      if (!raw) { showAlert('sim-single', '⚠️ الحقل فاضي', 'err'); return; }
+      const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+      const exist = new Set(DB.sim.map(x => x.serial));
+      let added = 0, skipped = 0;
+      lines.forEach(s => {
+        if (exist.has(s)) { skipped++; return; }
+        DB.sim.push({ serial: s, carton: 'بدون كرتونة', date: td(), added: ts() });
+        added++;
+        exist.add(s);
+      });
+      await save('sim', DB.sim);
+      showAlert('sim-single', `✅ تم إضافة ${added}${skipped ? ` — تجاهل ${skipped} مكررة` : ''}`);
+      document.getElementById('sim-bulk').value = '';
+      renderAll();
     }
 
     function removeRange(id) {
@@ -1387,8 +1411,9 @@
         const cartonLabel = x.carton || x.model || '-';
         const isNoCarton = type === 'sim' && x.carton === 'بدون كرتونة';
         const cartonStyle = isNoCarton ? 'color:var(--warn);font-weight:700' : '';
-        const cartonStatus = (type === 'sim' && x.carton && !isNoCarton && window.CARTONS && window.CARTONS[x.carton])
-          ? window.CARTONS[x.carton].status : null;
+        const cartonStatus = (type === 'sim' && x.carton && !isNoCarton)
+          ? (window.CARTONS[x.carton] ? window.CARTONS[x.carton].status : 'مغلقة')
+          : null;
         const statusBadge = cartonStatus === 'مفتوحة'
           ? ' <span style="font-size:9px;padding:2px 6px;border-radius:8px;background:rgba(255,179,0,.2);color:var(--warn);font-weight:700">مفتوحة</span>'
           : (cartonStatus === 'مغلقة' ? ' <span style="font-size:9px;padding:2px 6px;border-radius:8px;background:rgba(0,200,122,.15);color:var(--success);font-weight:700">مغلقة</span>' : '');
