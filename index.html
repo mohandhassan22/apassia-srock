@@ -1004,6 +1004,75 @@
 
     const TABLE = { sim: 'inventory_sim', vdsl: 'inventory_vdsl', ont: 'inventory_ont', air: 'inventory_air', mifi: 'inventory_mifi', sales: 'sales' };
 
+    function genSerials(f, t) {
+      try {
+        const nf = BigInt(f.replace(/\D/g, '')), nt = BigInt(t.replace(/\D/g, ''));
+        if (nt < nf || nt - nf > 1000n) return []; // Limit 1000 for safety
+        const prefix = f.slice(0, f.length - f.replace(/\D/g, '').length);
+        const res = [];
+        for (let i = nf; i <= nt; i++) res.push(prefix + i.toString());
+        return res;
+      } catch { return []; }
+    }
+
+    window.CARTONS = JSON.parse(localStorage.getItem('asr_cartons_meta') || '{}');
+    function saveCartons() { localStorage.setItem('asr_cartons_meta', JSON.stringify(window.CARTONS)); }
+
+    async function addSimCarton() {
+      const name = document.getElementById('sim-name').value.trim();
+      if (!name) { showAlert('sim', '⚠️ اكتب اسم الكرتونة', 'err'); return; }
+      const ranges = [];
+      for (let i = 1; i <= rangeCount; i++) {
+        const f = document.getElementById(`from-${i}`)?.value.trim();
+        const t = document.getElementById(`to-${i}`)?.value.trim();
+        if (f && t) ranges.push({ from: f, to: t });
+      }
+      if (!ranges.length) { showAlert('sim', '⚠️ أضف نطاق واحد على الأقل', 'err'); return; }
+      let allSers = [];
+      ranges.forEach(r => { allSers = allSers.concat(genSerials(r.from, r.to)); });
+      const newItems = allSers.map(s => ({ serial: s, carton: name, date: td(), added: ts() }));
+      DB.sim = DB.sim.concat(newItems);
+      window.CARTONS[name] = { status: 'مغلقة', ranges: ranges };
+      saveCartons();
+      saveLocal('sim', DB.sim);
+      save('sim', DB.sim);
+      showAlert('sim', `✅ تم إضافة ${newItems.length} شريحة في الكرتونة ${name}`);
+      document.getElementById('sim-name').value = '';
+      document.getElementById('ranges-container').innerHTML = '';
+      rangeCount = 0;
+      addRangeRow();
+      renderAll();
+    }
+
+    function openCarton(name) {
+      if (confirm(`هل تريد فتح كرتونة ${name}؟\nسيتم فك ارتباط جميع السيريالات بها.`)) {
+        openCartonIfNeeded(name);
+      }
+    }
+
+    async function openCartonIfNeeded(cartonName) {
+      if (!window.CARTONS[cartonName]) return;
+      if (window.CARTONS[cartonName].status === 'مغلقة') {
+        window.CARTONS[cartonName].status = 'مفتوحة';
+        saveCartons();
+        DB.sim.forEach(sim => {
+          if (sim.carton === cartonName) sim.carton = 'بدون كرتونة';
+        });
+        const ranges = window.CARTONS[cartonName].ranges || [];
+        ranges.forEach(r => {
+          const serials = genSerials(r.from, r.to);
+          serials.forEach(s => {
+            if (!DB.sim.find(x => x.serial === s)) {
+              DB.sim.push({ serial: s, carton: 'بدون كرتونة', date: td(), added: ts() });
+            }
+          });
+        });
+        saveLocal('sim', DB.sim);
+        save('sim', DB.sim);
+        renderAll();
+      }
+    }
+
     async function save(k, d) {
       saveLocal(k, d);
       if (!d || !d.length) return;
