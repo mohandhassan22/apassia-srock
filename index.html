@@ -629,6 +629,7 @@
               <option value="">كل الكرتونات</option>
               <option value="__nocarton__">بدون كرتونة</option>
             </select>
+            <button class="btn btn-danger btn-sm" onclick="deleteFullCarton()" style="width:auto">🗑 حذف الكرتونة بالكامل</button>
             <button class="btn btn-export btn-sm" onclick="exportSection('sim')">⬇ Excel</button>
           </div>
           <div class="twrap">
@@ -841,8 +842,8 @@
             </select>
           </div>
           <div class="fg">
-            <label>السيريل نمبر</label>
-            <input id="sale-serial" placeholder="اكتب السيريل هنا..." autocomplete="off" oninput="checkSerialLive()">
+            <label>السيريل نمبر (واحد أو أكثر - كل سيريل في سطر)</label>
+            <textarea id="sale-serial" placeholder="اكتب السيريل هنا..." autocomplete="off" oninput="checkSerialLive()" style="min-height:80px"></textarea>
             <div id="sale-serial-status" style="margin-top:6px;font-size:12px;font-weight:700;display:none"></div>
           </div>
           <div class="fg"><label>اسم العميل (اختياري)</label><input id="sale-customer" placeholder="اسم العميل...">
@@ -1296,6 +1297,30 @@
       renderAll();
     }
 
+    async function deleteFullCarton() {
+      const cartonName = document.getElementById('sim-filter-carton').value;
+      if (!cartonName || cartonName === '__nocarton__') {
+        alert('⚠️ يرجى اختيار كرتونة محددة لحذفها');
+        return;
+      }
+      if (!confirm(`⚠️ هل أنت متأكد من حذف كرتونة "${cartonName}" بالكامل؟ سيتم حذف جميع الشرائح التابعة لها من المخزن نهائياً.`)) return;
+      
+      const toDelete = DB.sim.filter(x => x.carton === cartonName);
+      DB.sim = DB.sim.filter(x => x.carton !== cartonName);
+      
+      delete window.CARTONS[cartonName];
+      saveCartons();
+      saveLocal('sim', DB.sim);
+      
+      for (const item of toDelete) {
+        await sbDelete(TABLE['sim'], item.serial);
+      }
+      
+      showAlert('sim', `✅ تم حذف الكرتونة "${cartonName}" وجميع محتوياتها`);
+      document.getElementById('sim-filter-carton').value = '';
+      renderAll();
+    }
+
     function renderTbl(type) {
       const q = (document.getElementById(type + '-search') || {}).value?.toLowerCase() || '';
       const cartonF = type === 'sim' ? (document.getElementById('sim-filter-carton') || {}).value || '' : '';
@@ -1375,43 +1400,74 @@
 
     function checkSerialLive() {
       const type = document.getElementById('sale-type').value;
-      const serial = document.getElementById('sale-serial').value.trim();
+      const raw = document.getElementById('sale-serial').value.trim();
       const status = document.getElementById('sale-serial-status');
-      if (!serial) { status.style.display = 'none'; return }
+      if (!raw) { status.style.display = 'none'; return }
       status.style.display = 'block';
       if (!type) { status.style.color = 'var(--warn)'; status.textContent = '⚠️ اختر نوع المنتج أولاً'; return }
-      const item = DB[type].find(x => x.serial === serial);
-      if (item) {
-        const extra = item.carton ? (` — كرتونة: ${item.carton}`) : (item.model && item.model !== '-' ? ` — موديل: ${item.model}` : '');
-        status.style.color = 'var(--success)';
-        status.textContent = `✅ موجود في المخزن${extra}`;
+      
+      const serials = raw.split('\n').map(s => s.trim()).filter(Boolean);
+      if (serials.length === 1) {
+        const item = DB[type].find(x => x.serial === serials[0]);
+        if (item) {
+          const extra = item.carton ? (` — كرتونة: ${item.carton}`) : (item.model && item.model !== '-' ? ` — موديل: ${item.model}` : '');
+          status.style.color = 'var(--success)';
+          status.textContent = `✅ موجود في المخزن${extra}`;
+        } else {
+          status.style.color = 'var(--danger)';
+          status.textContent = '❌ السيريل مش موجود في المخزن';
+        }
       } else {
-        status.style.color = 'var(--danger)';
-        status.textContent = '❌ السيريل مش موجود في المخزن';
+        let found = 0;
+        serials.forEach(s => { if (DB[type].find(x => x.serial === s)) found++; });
+        status.style.color = found === serials.length ? 'var(--success)' : 'var(--warn)';
+        status.textContent = `🔍 تم العثور على ${found} من أصل ${serials.length} في المخزن`;
       }
     }
 
-    function addSale() {
+    async function addSale() {
       const type = document.getElementById('sale-type').value;
-      const serial = document.getElementById('sale-serial').value.trim();
+      const raw = document.getElementById('sale-serial').value.trim();
       const customer = document.getElementById('sale-customer').value.trim();
       const notes = document.getElementById('sale-notes').value.trim();
+      
       if (!type) { showAlert('sale', '⚠️ اختر نوع المنتج', 'err'); return }
-      if (!serial) { showAlert('sale', '⚠️ اكتب السيريل النمبر', 'err'); return }
-      const item = DB[type].find(x => x.serial === serial);
-      if (!item) { showAlert('sale', '❌ السيريل مش موجود في المخزن', 'err'); return }
-      const soldCarton = item.carton || null;
-      DB.sales.push({ id: Date.now() + '', type, serial, customer, notes, model: item.model || null, carton: soldCarton, date: ts() });
-      DB[type] = DB[type].filter(x => x.serial !== serial);
+      if (!raw) { showAlert('sale', '⚠️ اكتب السيريل النمبر', 'err'); return }
+      
+      const serials = raw.split('\n').map(s => s.trim()).filter(Boolean);
+      const toSell = [];
+      const notFound = [];
+      
+      serials.forEach(s => {
+        const item = DB[type].find(x => x.serial === s);
+        if (item) toSell.push(item);
+        else notFound.push(s);
+      });
+      
+      if (notFound.length > 0) {
+        showAlert('sale', `❌ السيريلات التالية غير موجودة: ${notFound.join(', ')}`, 'err');
+        return;
+      }
+      
+      for (const item of toSell) {
+        const soldCarton = item.carton || null;
+        const saleId = Date.now() + Math.random().toString(36).substr(2, 5);
+        DB.sales.push({ id: saleId, type, serial: item.serial, customer, notes, model: item.model || null, carton: soldCarton, date: ts() });
+        DB[type] = DB[type].filter(x => x.serial !== item.serial);
+        
+        await sbDelete(TABLE[type], item.serial);
+        
+        if (type === 'sim' && soldCarton && soldCarton !== 'بدون كرتونة') {
+          await openCartonIfNeeded(soldCarton);
+        }
+      }
+      
       saveLocal(type, DB[type]);
       saveLocal('sales', DB.sales);
-      sbDelete(TABLE[type], serial);
       save('sales', DB.sales);
-      showAlert('sale', `✅ تم بيع ${LABELS[type]} — ${serial}`);
-      // Auto-open carton if this was a SIM from a named carton
-      if (type === 'sim' && soldCarton && soldCarton !== 'بدون كرتونة') {
-        setTimeout(() => openCartonIfNeeded(soldCarton), 300);
-      }
+      
+      showAlert('sale', `✅ تم تسجيل بيع ${toSell.length} عنصر بنجاح`);
+      
       document.getElementById('sale-type').value = '';
       document.getElementById('sale-serial').value = '';
       document.getElementById('sale-serial-status').style.display = 'none';
