@@ -1311,9 +1311,8 @@
       saveCartons();
       saveLocal('sim', DB.sim);
       
-      for (const item of toDelete) {
-        await sbDelete(TABLE['sim'], item.serial);
-      }
+      // Delete from Supabase in background
+      toDelete.forEach(item => sbDelete(TABLE['sim'], item.serial));
       
       showAlert('sim', `✅ تم حذف الكرتونة "${cartonName}" وجميع محتوياتها`);
       document.getElementById('sim-filter-carton').value = '';
@@ -1433,7 +1432,8 @@
       if (!type) { showAlert('sale', '⚠️ اختر نوع المنتج', 'err'); return }
       if (!raw) { showAlert('sale', '⚠️ اكتب السيريل النمبر', 'err'); return }
       
-      const serials = raw.split('\n').map(s => s.trim()).filter(Boolean);
+      // Support both space-separated and newline-separated serials
+      const serials = raw.split(/[\n\s,]+/).map(s => s.trim()).filter(Boolean);
       const toSell = [];
       const notFound = [];
       
@@ -1448,16 +1448,27 @@
         return;
       }
       
+      if (toSell.length === 0) {
+        showAlert('sale', '⚠️ لا توجد سيريلات صالحة للبيع', 'err');
+        return;
+      }
+
+      // Process sales
+      const salesData = [];
       for (const item of toSell) {
         const soldCarton = item.carton || null;
         const saleId = Date.now() + Math.random().toString(36).substr(2, 5);
-        DB.sales.push({ id: saleId, type, serial: item.serial, customer, notes, model: item.model || null, carton: soldCarton, date: ts() });
+        const saleItem = { id: saleId, type, serial: item.serial, customer, notes, model: item.model || null, carton: soldCarton, date: ts() };
+        
+        DB.sales.push(saleItem);
+        salesData.push(saleItem);
         DB[type] = DB[type].filter(x => x.serial !== item.serial);
         
-        await sbDelete(TABLE[type], item.serial);
+        // Background sync with Supabase
+        sbDelete(TABLE[type], item.serial);
         
         if (type === 'sim' && soldCarton && soldCarton !== 'بدون كرتونة') {
-          await openCartonIfNeeded(soldCarton);
+          openCartonIfNeeded(soldCarton);
         }
       }
       
