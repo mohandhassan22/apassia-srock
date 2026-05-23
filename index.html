@@ -1443,13 +1443,8 @@
         else notFound.push(s);
       });
       
-      if (notFound.length > 0) {
-        showAlert('sale', `❌ السيريلات التالية غير موجودة: ${notFound.join(', ')}`, 'err');
-        return;
-      }
-      
       if (toSell.length === 0) {
-        showAlert('sale', '⚠️ لا توجد سيريلات صالحة للبيع', 'err');
+        showAlert('sale', `❌ كل السيريلات غير موجودة في المخزن: ${notFound.join(', ')}`, 'err');
         return;
       }
 
@@ -1476,7 +1471,8 @@
       saveLocal('sales', DB.sales);
       save('sales', DB.sales);
       
-      showAlert('sale', `✅ تم تسجيل بيع ${toSell.length} عنصر بنجاح`);
+      const skipMsg = notFound.length > 0 ? ` — تم تجاهل ${notFound.length} سيريل غير موجود: ${notFound.join(', ')}` : '';
+      showAlert('sale', `✅ تم تسجيل بيع ${toSell.length} عنصر بنجاح${skipMsg}`);
       
       document.getElementById('sale-type').value = '';
       document.getElementById('sale-serial').value = '';
